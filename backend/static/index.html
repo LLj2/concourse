@@ -120,6 +120,10 @@
     .modal input.code {
       text-align: center; font-size: 22px; letter-spacing: 8px; font-weight: 600;
     }
+    .modal .hint { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+    .modal details { margin: 0 0 14px; }
+    .modal summary { cursor: pointer; font-size: 13px; color: var(--accent); margin-bottom: 12px; }
+    .modal details .btn-primary { width: 100%; }
     .modal .row { display: flex; gap: 8px; }
     .modal .btn { flex: 1; padding: 11px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--border); }
     .modal .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
@@ -170,24 +174,28 @@
   <div class="modal-bg" id="signup-modal" role="dialog" aria-modal="true">
     <div class="modal">
       <h2>Start your trial</h2>
-      <p id="signup-intro">We email you a 6-digit code (and a magic link). Enter the code below, or just click the link. No password to remember.</p>
+      <p id="signup-intro">We email you a sign-in link. Click it from this device to sign in. No password to remember.</p>
 
       <!-- Step 1: email -->
       <div id="step-email">
         <input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email" />
         <div class="row">
           <button class="btn" id="signup-cancel" type="button">Cancel</button>
-          <button class="btn btn-primary" id="signup-submit" type="button">Send code</button>
+          <button class="btn btn-primary" id="signup-submit" type="button">Send sign-in email</button>
         </div>
       </div>
 
-      <!-- Step 2: code -->
-      <div id="step-code" style="display:none">
-        <input type="text" class="code" id="signup-code" placeholder="123456"
-               inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
-        <div class="row">
-          <button class="btn" id="code-back" type="button">Back</button>
+      <!-- Step 2: email sent — link is primary, 6-digit code is an optional fallback -->
+      <div id="step-sent" style="display:none">
+        <p class="hint">Check your inbox and click the sign-in link to continue.</p>
+        <details id="code-fallback">
+          <summary>Got a 6-digit code instead? Enter it here</summary>
+          <input type="text" class="code" id="signup-code" placeholder="123456"
+                 inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
           <button class="btn btn-primary" id="code-submit" type="button">Verify &amp; sign in</button>
+        </details>
+        <div class="row">
+          <button class="btn" id="code-back" type="button">Use a different email</button>
         </div>
       </div>
 
@@ -241,13 +249,13 @@
     })();
 
     // ===========================
-    // Signup modal — 6-digit OTP flow (with magic link as fallback)
+    // Signup modal — magic link primary, 6-digit OTP as optional fallback
     // ===========================
     var modal = document.getElementById('signup-modal');
     var emailInput = document.getElementById('signup-email');
     var codeInput = document.getElementById('signup-code');
     var stepEmail = document.getElementById('step-email');
-    var stepCode = document.getElementById('step-code');
+    var stepSent = document.getElementById('step-sent');
     var msg = document.getElementById('signup-msg');
     var submitBtn = document.getElementById('signup-submit');
     var verifyBtn = document.getElementById('code-submit');
@@ -257,19 +265,18 @@
       catch (e) { return null; }
     }
     function showEmailStep() {
-      stepCode.style.display = 'none';
+      stepSent.style.display = 'none';
       stepEmail.style.display = '';
       msg.textContent = ''; msg.className = 'msg';
       setTimeout(function () { emailInput.focus(); }, 50);
     }
-    function showCodeStep() {
+    function showSentStep() {
       stepEmail.style.display = 'none';
-      stepCode.style.display = '';
+      stepSent.style.display = '';
       codeInput.value = '';
-      setTimeout(function () { codeInput.focus(); }, 50);
     }
     function openModal() {
-      submitBtn.disabled = false; submitBtn.textContent = 'Send code';
+      submitBtn.disabled = false; submitBtn.textContent = 'Send sign-in email';
       verifyBtn.disabled = false; verifyBtn.textContent = 'Verify & sign in';
       modal.classList.add('open');
       showEmailStep();
@@ -285,7 +292,7 @@
     document.getElementById('code-back').addEventListener('click', showEmailStep);
     modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
 
-    // Step 1 — request the code (and magic link) via Supabase
+    // Step 1 — request the sign-in email (link + code, depending on Supabase setup)
     submitBtn.addEventListener('click', async function () {
       var email = emailInput.value.trim();
       if (!email || !email.includes('@')) {
@@ -300,14 +307,14 @@
           body: JSON.stringify({ email: email, utm: getUtm() }),
         });
         if (!r.ok) throw new Error((await r.text()) || 'request failed');
-        if (window.posthog) posthog.capture('signup_code_sent', { email_domain: email.split('@')[1] });
-        showCodeStep();
+        if (window.posthog) posthog.capture('signup_email_sent', { email_domain: email.split('@')[1] });
+        showSentStep();
         msg.className = 'msg ok';
-        msg.textContent = 'We emailed a 6-digit code to ' + email + '. Enter it above (or click the link in the email).';
+        msg.textContent = 'Sent to ' + email + '. Click the sign-in link in the email.';
       } catch (e) {
         msg.className = 'msg err';
-        msg.textContent = 'Could not send code: ' + e.message;
-        submitBtn.disabled = false; submitBtn.textContent = 'Send code';
+        msg.textContent = 'Could not send email: ' + e.message;
+        submitBtn.disabled = false; submitBtn.textContent = 'Send sign-in email';
       }
     });
 
