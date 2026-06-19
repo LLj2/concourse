@@ -20,7 +20,7 @@ from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, Response, Cookie, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import text
@@ -279,7 +279,10 @@ async def exchange(
         raise HTTPException(status_code=401, detail="user_missing_fields")
 
     next_path = _complete_login(db, request, response, sb_user_id, email)
-    return JSONResponse({"ok": True, "next": next_path})
+    # Return a plain dict (not JSONResponse) so FastAPI merges the Set-Cookie
+    # headers set on the injected `response` — a separate Response object would
+    # drop them, leaving the user without a session.
+    return {"ok": True, "next": next_path}
 
 
 @router.post("/api/auth/verify-otp")
@@ -333,7 +336,8 @@ async def verify_otp(
     next_path = _complete_login(
         db, request, response, sb_user_id, email, fallback_utm=req.utm
     )
-    return JSONResponse({"ok": True, "next": next_path})
+    # Plain dict so the session cookie set on `response` is actually sent.
+    return {"ok": True, "next": next_path}
 
 
 @router.post("/api/auth/logout")
