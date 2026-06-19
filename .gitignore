@@ -16,6 +16,11 @@ build/
 .env.local
 .env.*.local
 
+# Secret handover files — NEVER commit these
+*SECRETS*.md
+*secrets*.md
+HANDOVER_*.md
+
 # IDE
 .vscode/
 .idea/
