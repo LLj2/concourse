@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+httpx
+pydantic
+python-dotenv
+anthropic
+sqlalchemy
+psycopg[binary]
+stripe
+itsdangerous
+pytest

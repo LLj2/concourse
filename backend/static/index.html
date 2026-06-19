@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Concourse — your EPSO study coach</title>
+  <meta name="description" content="An AI study coach that builds your EPSO preparation plan from your real performance, not your guesses." />
+  <style>
+    :root {
+      --ink: #0f1d3a;
+      --muted: #5a6b8a;
+      --accent: #1e63d6;
+      --bg: #f7f9fc;
+      --card: #ffffff;
+      --border: #e5e9f2;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55;
+    }
+    .nav {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 22px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand { font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+    .nav a { color: var(--muted); text-decoration: none; font-size: 14px; }
+    .hero {
+      max-width: 780px;
+      margin: 60px auto 40px;
+      padding: 0 24px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 44px;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin: 0 0 18px;
+    }
+    .lede {
+      font-size: 19px;
+      color: var(--muted);
+      margin: 0 auto 28px;
+      max-width: 600px;
+    }
+    .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block;
+      padding: 12px 22px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid transparent;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #174fa8; }
+    .btn-secondary {
+      background: white;
+      color: var(--ink);
+      border-color: var(--border);
+    }
+    .meta { color: var(--muted); font-size: 13px; margin-top: 14px; }
+
+    .features {
+      max-width: 980px;
+      margin: 60px auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    .feature {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px;
+    }
+    .feature h3 { margin: 0 0 8px; font-size: 16px; }
+    .feature p { margin: 0; color: var(--muted); font-size: 14px; }
+    @media (max-width: 720px) {
+      h1 { font-size: 32px; }
+      .features { grid-template-columns: 1fr; }
+    }
+
+    footer {
+      max-width: 980px;
+      margin: 60px auto 30px;
+      padding: 24px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="brand">Concourse</div>
+    <a href="#waitlist">Sign in</a>
+  </nav>
+
+  <section class="hero">
+    <h1>Your EPSO coach. Built around the way you actually study.</h1>
+    <p class="lede">
+      Concourse measures your real reasoning skill, watches what you practise on EUTraining and ORSEU, and rewrites your plan whenever the data changes. Not when a calendar says so.
+    </p>
+    <div class="cta-row">
+      <a id="trial-cta" class="btn btn-primary" href="#waitlist">Start 7-day trial</a>
+      <a class="btn btn-secondary" href="#how">How it works</a>
+    </div>
+    <div class="meta">€24.99/month after trial. Card required at signup.</div>
+  </section>
+
+  <section class="features" id="how">
+    <div class="feature">
+      <h3>Measure, do not guess</h3>
+      <p>Short in-product checks calibrate your verbal, numerical, and abstract reasoning over time. No hour-long intake test.</p>
+    </div>
+    <div class="feature">
+      <h3>Bring your practice</h3>
+      <p>Paste or screenshot your EUTraining results. Concourse parses them and adjusts your plan within minutes.</p>
+    </div>
+    <div class="feature">
+      <h3>Plan that updates itself</h3>
+      <p>New data triggers a rewrite. You see what changed and why, every time.</p>
+    </div>
+  </section>
+
+  <footer>
+    Concourse · EPSO preparation, AI-orchestrated · <a href="/health" style="color: var(--muted);">status</a>
+  </footer>
+
+  <!-- Public config is served by the FastAPI app at /config.js -->
+  <script src="/config.js"></script>
+  <script>
+    // ===========================
+    // UTM capture → localStorage
+    // ===========================
+    // We persist the first-touch UTM so that signup can attribute the user
+    // to the channel that brought them in, even if they bounce and return.
+    (function captureUtm() {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var keys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+        var hasAny = keys.some(function (k) { return params.has(k); });
+        if (!hasAny) return;
+        var existing = JSON.parse(localStorage.getItem('concourse_utm') || 'null');
+        // First-touch wins: do not overwrite if we already have UTM data
+        if (existing) return;
+        var payload = { captured_at: new Date().toISOString() };
+        keys.forEach(function (k) {
+          if (params.has(k)) payload[k] = params.get(k);
+        });
+        localStorage.setItem('concourse_utm', JSON.stringify(payload));
+      } catch (e) { /* swallow */ }
+    })();
+
+    // ===========================
+    // PostHog (lazy-init only when key is configured)
+    // ===========================
+    (function initPosthog() {
+      var cfg = window.__CONCOURSE__ || {};
+      if (!cfg.posthogKey) return;
+      // Standard PostHog snippet (trimmed)
+      !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey getNextSurveyStep identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing startSessionRecording stopSessionRecording startSessionReplay stopSessionReplay sessionRecordingStarted sessionReplayStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_session_recording opt_out_session_recording has_opted_in_session_recording has_opted_out_session_recording clear_opt_in_out_session_recording createPerson distinct_id getDistinctId currentDistinctId currentSessionId getSessionId getPersonProperties debug getPageViewId captureTraceFeedback captureTraceMetric".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+      posthog.init(cfg.posthogKey, {
+        api_host: cfg.posthogHost || 'https://eu.posthog.com',
+        person_profiles: 'identified_only',
+        capture_pageview: true,
+      });
+      // Stash UTM as super-properties so every event carries them
+      try {
+        var utm = JSON.parse(localStorage.getItem('concourse_utm') || 'null');
+        if (utm) posthog.register(utm);
+      } catch (e) { /* swallow */ }
+    })();
+
+    // CTA -> placeholder action (signup flow ships in session 2)
+    document.getElementById('trial-cta').addEventListener('click', function (e) {
+      if (window.posthog) posthog.capture('landing_cta_click', { cta: 'start_trial' });
+    });
+  </script>
+</body>
+</html>
