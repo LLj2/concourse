@@ -82,6 +82,12 @@ class ExchangeRequest(BaseModel):
     access_token: str
 
 
+class VerifyOtpRequest(BaseModel):
+    email: EmailStr
+    token: str
+    utm: Optional[dict] = None
+
+
 # ---------- routes ----------
 
 @router.post("/api/auth/signup")
@@ -166,35 +172,21 @@ def callback_landing():
     )
 
 
-@router.post("/api/auth/exchange")
-async def exchange(
-    req: ExchangeRequest,
+def _complete_login(
+    db: Session,
     request: Request,
     response: Response,
-    db: Session = Depends(get_db),
-):
-    """Verify the access token with Supabase, upsert user row, set session cookie."""
-    if not settings.supabase_url or not settings.supabase_anon_key:
-        raise HTTPException(status_code=500, detail="supabase_not_configured")
+    sb_user_id: str,
+    email: str,
+    fallback_utm: Optional[dict] = None,
+) -> str:
+    """Upsert the user, log the signup event, set the session cookie.
 
-    # Fetch the user from Supabase using the access token
-    async with httpx.AsyncClient(timeout=15) as client:
-        r = await client.get(
-            f"{settings.supabase_url}/auth/v1/user",
-            headers={
-                "apikey": settings.supabase_anon_key,
-                "Authorization": f"Bearer {req.access_token}",
-            },
-        )
-    if r.status_code >= 400:
-        raise HTTPException(status_code=401, detail=f"token_invalid: {r.text}")
-    user = r.json()
-    sb_user_id = user.get("id")
-    email = user.get("email")
-    if not sb_user_id or not email:
-        raise HTTPException(status_code=401, detail="user_missing_fields")
-
-    # Read pending UTM (if any) from the short-lived cookie
+    Shared by both auth paths (magic-link `exchange` and 6-digit `verify_otp`).
+    Returns the path to redirect to (`/intake` for new users, `/me` otherwise).
+    """
+    # Prefer UTM from the short-lived signup cookie; fall back to what the
+    # client passed (e.g. when cookies are blocked on the verify call).
     utm = {}
     pending = request.cookies.get(UTM_COOKIE)
     if pending:
@@ -204,6 +196,8 @@ async def exchange(
                 utm = payload.get("utm") or {}
         except (BadSignature, SignatureExpired):
             pass
+    if not utm and fallback_utm:
+        utm = fallback_utm
 
     # Upsert into our users table. Supabase's auth.users.id (UUID) is reused.
     db.execute(
@@ -253,7 +247,92 @@ async def exchange(
         samesite="lax",
     )
     response.delete_cookie(UTM_COOKIE)
+    return next_path
 
+
+@router.post("/api/auth/exchange")
+async def exchange(
+    req: ExchangeRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Magic-link path: verify the access token with Supabase, then log in."""
+    if not settings.supabase_url or not settings.supabase_anon_key:
+        raise HTTPException(status_code=500, detail="supabase_not_configured")
+
+    # Fetch the user from Supabase using the access token
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{settings.supabase_url}/auth/v1/user",
+            headers={
+                "apikey": settings.supabase_anon_key,
+                "Authorization": f"Bearer {req.access_token}",
+            },
+        )
+    if r.status_code >= 400:
+        raise HTTPException(status_code=401, detail=f"token_invalid: {r.text}")
+    user = r.json()
+    sb_user_id = user.get("id")
+    email = user.get("email")
+    if not sb_user_id or not email:
+        raise HTTPException(status_code=401, detail="user_missing_fields")
+
+    next_path = _complete_login(db, request, response, sb_user_id, email)
+    return JSONResponse({"ok": True, "next": next_path})
+
+
+@router.post("/api/auth/verify-otp")
+async def verify_otp(
+    req: VerifyOtpRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """6-digit code path: verify the OTP with Supabase, then log in.
+
+    Resistant to email link-scanners (e.g. Gmail) that pre-consume single-use
+    magic links — the user types a code instead of clicking a link.
+    """
+    if not settings.supabase_url or not settings.supabase_anon_key:
+        raise HTTPException(status_code=500, detail="supabase_not_configured")
+
+    token = (req.token or "").strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="missing_token")
+
+    # GoTrue's /verify type depends on whether this is a brand-new user
+    # (signup confirmation) or an existing one (plain email OTP). Try the
+    # common case first, then fall back. A type mismatch returns an error
+    # without consuming the code, so the fallback is safe.
+    data = None
+    last_err = ""
+    async with httpx.AsyncClient(timeout=15) as client:
+        for otp_type in ("email", "signup"):
+            r = await client.post(
+                f"{settings.supabase_url}/auth/v1/verify",
+                headers={
+                    "apikey": settings.supabase_anon_key,
+                    "Content-Type": "application/json",
+                },
+                json={"type": otp_type, "email": req.email, "token": token},
+            )
+            if r.status_code < 400:
+                data = r.json()
+                break
+            last_err = r.text
+    if data is None:
+        raise HTTPException(status_code=400, detail=f"otp_verify_failed: {last_err}")
+
+    sb_user = data.get("user") or {}
+    sb_user_id = sb_user.get("id")
+    email = sb_user.get("email") or req.email
+    if not sb_user_id:
+        raise HTTPException(status_code=401, detail="user_missing_fields")
+
+    next_path = _complete_login(
+        db, request, response, sb_user_id, email, fallback_utm=req.utm
+    )
     return JSONResponse({"ok": True, "next": next_path})
 
 
