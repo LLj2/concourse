@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import time
 from typing import Optional
+from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, Response, Cookie, Depends
@@ -90,7 +91,11 @@ async def signup(req: SignupRequest, response: Response):
         raise HTTPException(status_code=500, detail="supabase_not_configured")
 
     redirect_to = f"{settings.public_base_url}/auth/callback"
-    url = f"{settings.supabase_url}/auth/v1/otp"
+    # GoTrue's REST API reads the post-auth redirect from the `redirect_to`
+    # query param, NOT from a body field. (`options.email_redirect_to` is the
+    # JS SDK shape and is silently ignored here, so links fell back to the
+    # Supabase Site URL and landed on `/` instead of `/auth/callback`.)
+    url = f"{settings.supabase_url}/auth/v1/otp?redirect_to={quote(redirect_to, safe='')}"
 
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.post(
@@ -102,7 +107,6 @@ async def signup(req: SignupRequest, response: Response):
             json={
                 "email": req.email,
                 "create_user": True,
-                "options": {"email_redirect_to": redirect_to},
             },
         )
     if r.status_code >= 400:
