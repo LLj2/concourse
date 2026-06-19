@@ -100,6 +100,30 @@
       border-top: 1px solid var(--border);
       text-align: center;
     }
+
+    /* Signup modal */
+    .modal-bg {
+      position: fixed; inset: 0; background: rgba(15, 29, 58, 0.45);
+      display: none; align-items: center; justify-content: center; z-index: 50;
+    }
+    .modal-bg.open { display: flex; }
+    .modal {
+      background: white; border-radius: 12px; padding: 28px;
+      width: 100%; max-width: 420px; box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+    }
+    .modal h2 { margin: 0 0 6px; font-size: 20px; }
+    .modal p { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
+    .modal input[type="email"] {
+      width: 100%; padding: 11px 12px; border: 1px solid var(--border);
+      border-radius: 8px; font: inherit; margin-bottom: 12px; box-sizing: border-box;
+    }
+    .modal .row { display: flex; gap: 8px; }
+    .modal .btn { flex: 1; padding: 11px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--border); }
+    .modal .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
+    .modal .btn-primary:disabled { background: #aab; border-color: #aab; cursor: not-allowed; }
+    .modal .msg { font-size: 13px; margin-top: 12px; }
+    .modal .msg.err { color: #c03; }
+    .modal .msg.ok  { color: #137a3b; }
   </style>
 </head>
 <body>
@@ -138,6 +162,20 @@
   <footer>
     Concourse · EPSO preparation, AI-orchestrated · <a href="/health" style="color: var(--muted);">status</a>
   </footer>
+
+  <!-- Signup modal -->
+  <div class="modal-bg" id="signup-modal" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h2>Start your trial</h2>
+      <p>We send a magic link. Click it from this device to sign in. No password to remember.</p>
+      <input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email" />
+      <div class="row">
+        <button class="btn" id="signup-cancel" type="button">Cancel</button>
+        <button class="btn btn-primary" id="signup-submit" type="button">Send link</button>
+      </div>
+      <div class="msg" id="signup-msg"></div>
+    </div>
+  </div>
 
   <!-- Public config is served by the FastAPI app at /config.js -->
   <script src="/config.js"></script>
@@ -184,9 +222,57 @@
       } catch (e) { /* swallow */ }
     })();
 
-    // CTA -> placeholder action (signup flow ships in session 2)
+    // ===========================
+    // Signup modal + magic-link flow
+    // ===========================
+    var modal = document.getElementById('signup-modal');
+    var emailInput = document.getElementById('signup-email');
+    var msg = document.getElementById('signup-msg');
+    var submitBtn = document.getElementById('signup-submit');
+
+    function openModal() {
+      msg.textContent = ''; msg.className = 'msg';
+      modal.classList.add('open');
+      setTimeout(function () { emailInput.focus(); }, 50);
+    }
+    function closeModal() {
+      modal.classList.remove('open');
+    }
+
     document.getElementById('trial-cta').addEventListener('click', function (e) {
+      e.preventDefault();
       if (window.posthog) posthog.capture('landing_cta_click', { cta: 'start_trial' });
+      openModal();
+    });
+    document.getElementById('signup-cancel').addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+
+    submitBtn.addEventListener('click', async function () {
+      var email = emailInput.value.trim();
+      if (!email || !email.includes('@')) {
+        msg.className = 'msg err'; msg.textContent = 'Enter a valid email.'; return;
+      }
+      var utm = null;
+      try { utm = JSON.parse(localStorage.getItem('concourse_utm') || 'null'); } catch (e) {}
+
+      submitBtn.disabled = true; submitBtn.textContent = 'Sending…';
+      msg.className = 'msg'; msg.textContent = '';
+      try {
+        var r = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ email: email, utm: utm }),
+        });
+        if (!r.ok) throw new Error((await r.text()) || 'request failed');
+        msg.className = 'msg ok';
+        msg.textContent = 'Check your inbox. The link signs you in directly.';
+        if (window.posthog) posthog.capture('signup_link_sent', { email_domain: email.split('@')[1] });
+        submitBtn.textContent = 'Sent';
+      } catch (e) {
+        msg.className = 'msg err';
+        msg.textContent = 'Could not send link: ' + e.message;
+        submitBtn.disabled = false; submitBtn.textContent = 'Send link';
+      }
     });
   </script>
 </body>

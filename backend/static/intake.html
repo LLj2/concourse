@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Concourse — set up your plan</title>
+  <style>
+    :root {
+      --ink: #0f1d3a; --muted: #5a6b8a; --accent: #1e63d6;
+      --bg: #f7f9fc; --card: #fff; --border: #e5e9f2;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      color: var(--ink); background: var(--bg); line-height: 1.5;
+    }
+    .nav {
+      max-width: 720px; margin: 0 auto; padding: 22px 24px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .brand { font-weight: 700; font-size: 18px; }
+    .progress { color: var(--muted); font-size: 13px; }
+
+    .wrap { max-width: 640px; margin: 30px auto 80px; padding: 0 24px; }
+    h1 { font-size: 28px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -0.01em; }
+    .lede { color: var(--muted); margin: 0 0 28px; }
+
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 22px; margin-bottom: 16px;
+    }
+    .card h3 { margin: 0 0 4px; font-size: 16px; }
+    .card .help { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+
+    label { display: block; margin-bottom: 12px; font-size: 14px; }
+    label .lab { display: block; font-weight: 600; margin-bottom: 4px; }
+    input[type="text"], input[type="number"], input[type="date"], select, textarea {
+      width: 100%; padding: 9px 10px; border: 1px solid var(--border);
+      border-radius: 6px; font: inherit; color: inherit; background: white;
+    }
+    .inline { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .likert { display: flex; gap: 6px; }
+    .likert input { display: none; }
+    .likert label {
+      flex: 1; text-align: center; padding: 8px 0;
+      border: 1px solid var(--border); border-radius: 6px;
+      cursor: pointer; user-select: none; font-size: 14px; margin: 0;
+    }
+    .likert input:checked + label {
+      background: var(--accent); color: white; border-color: var(--accent);
+    }
+    .likert .scale {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: var(--muted); margin-top: 4px;
+    }
+
+    .energy { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .energy .pill {
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 10px; font-size: 13px; background: white;
+    }
+    .energy .pill .lab { font-weight: 600; margin-bottom: 6px; font-size: 12px; color: var(--muted); }
+    .energy .pill select { font-size: 13px; padding: 6px 8px; }
+
+    .toggle { display: flex; gap: 8px; }
+    .toggle input { display: none; }
+    .toggle label {
+      flex: 1; text-align: center; padding: 9px;
+      border: 1px solid var(--border); border-radius: 6px;
+      cursor: pointer; margin: 0; font-size: 14px;
+    }
+    .toggle input:checked + label {
+      background: var(--accent); color: white; border-color: var(--accent);
+    }
+
+    .actions { display: flex; gap: 12px; align-items: center; margin-top: 20px; }
+    .btn {
+      padding: 11px 22px; border-radius: 8px; border: 1px solid transparent;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #174fa8; }
+    .btn-primary:disabled { background: #aab; cursor: not-allowed; }
+    .err { color: #c03; font-size: 13px; }
+    .ok  { color: #137a3b; font-size: 13px; }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="brand">Concourse</div>
+    <div class="progress">Step 1 of 1 · setup</div>
+  </nav>
+
+  <main class="wrap">
+    <h1>Tell us about your prep</h1>
+    <p class="lede">Five quick questions. We use them to build your first plan today, then refine it as we measure.</p>
+
+    <form id="intake-form">
+      <!-- Target competition + timing -->
+      <section class="card">
+        <h3>Your target</h3>
+        <p class="help">If you do not have an exact date, give your best estimate. We will adjust.</p>
+        <label>
+          <span class="lab">Target competition</span>
+          <select name="target_competition" required>
+            <option value="">Select…</option>
+            <option value="AD5_generalist">AD5 generalist (autumn 2026 wave)</option>
+            <option value="AD7_ict">AD7 ICT / specialist</option>
+            <option value="AST">AST (assistant)</option>
+            <option value="other">Other / not sure yet</option>
+          </select>
+        </label>
+        <div class="inline">
+          <label>
+            <span class="lab">Weeks to exam</span>
+            <input type="number" name="weeks_to_exam" min="1" max="104" required />
+          </label>
+          <label>
+            <span class="lab">Hours per week you can study</span>
+            <input type="number" name="weekly_hours" min="1" max="60" required />
+          </label>
+        </div>
+      </section>
+
+      <!-- Energy pattern -->
+      <section class="card">
+        <h3>When are you sharpest?</h3>
+        <p class="help">Helps us slot harder topics into the right time of day.</p>
+        <div class="energy">
+          <div class="pill"><div class="lab">Morning</div>
+            <select name="energy_morning"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select>
+          </div>
+          <div class="pill"><div class="lab">Afternoon</div>
+            <select name="energy_afternoon"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select>
+          </div>
+          <div class="pill"><div class="lab">Evening</div>
+            <select name="energy_evening"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Prior EPSO experience -->
+      <section class="card">
+        <h3>Have you done EPSO-style tests before?</h3>
+        <p class="help">If yes, we skip the intake calibration. You can take a 5-minute quick check later from your dashboard.</p>
+        <div class="toggle">
+          <input type="radio" id="prior-yes" name="has_prior_epso_experience" value="true" />
+          <label for="prior-yes">Yes</label>
+          <input type="radio" id="prior-no"  name="has_prior_epso_experience" value="false" checked />
+          <label for="prior-no">Not yet</label>
+        </div>
+        <label style="margin-top: 14px;" id="last-test-label">
+          <span class="lab">When was your last EPSO-style test? (optional)</span>
+          <input type="date" name="last_epso_test_at" />
+        </label>
+      </section>
+
+      <!-- Soft self-assessment -->
+      <section class="card">
+        <h3>A quick self-assessment</h3>
+        <p class="help">1 = not at all, 5 = strong. Honest is better than optimistic — wrong baselines waste your time.</p>
+
+        <label>
+          <span class="lab">Preparation habits (do you study consistently, with a method?)</span>
+          <div class="likert" data-name="self_habits_score">
+            <input type="radio" name="self_habits_score" value="1" id="h1" /><label for="h1">1</label>
+            <input type="radio" name="self_habits_score" value="2" id="h2" /><label for="h2">2</label>
+            <input type="radio" name="self_habits_score" value="3" id="h3" checked /><label for="h3">3</label>
+            <input type="radio" name="self_habits_score" value="4" id="h4" /><label for="h4">4</label>
+            <input type="radio" name="self_habits_score" value="5" id="h5" /><label for="h5">5</label>
+          </div>
+        </label>
+
+        <label>
+          <span class="lab">Test strategy (pacing, guessing, time management on multiple-choice)</span>
+          <div class="likert" data-name="self_strategy_score">
+            <input type="radio" name="self_strategy_score" value="1" id="s1" /><label for="s1">1</label>
+            <input type="radio" name="self_strategy_score" value="2" id="s2" /><label for="s2">2</label>
+            <input type="radio" name="self_strategy_score" value="3" id="s3" checked /><label for="s3">3</label>
+            <input type="radio" name="self_strategy_score" value="4" id="s4" /><label for="s4">4</label>
+            <input type="radio" name="self_strategy_score" value="5" id="s5" /><label for="s5">5</label>
+          </div>
+        </label>
+
+        <label>
+          <span class="lab">EU knowledge breadth (institutions, treaties, policy areas)</span>
+          <div class="likert" data-name="self_eu_breadth_score">
+            <input type="radio" name="self_eu_breadth_score" value="1" id="e1" /><label for="e1">1</label>
+            <input type="radio" name="self_eu_breadth_score" value="2" id="e2" /><label for="e2">2</label>
+            <input type="radio" name="self_eu_breadth_score" value="3" id="e3" checked /><label for="e3">3</label>
+            <input type="radio" name="self_eu_breadth_score" value="4" id="e4" /><label for="e4">4</label>
+            <input type="radio" name="self_eu_breadth_score" value="5" id="e5" /><label for="e5">5</label>
+          </div>
+        </label>
+      </section>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="submit-btn" type="submit">Build my plan</button>
+        <span id="status" class="err"></span>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    var form = document.getElementById('intake-form');
+    var status = document.getElementById('status');
+    var btn = document.getElementById('submit-btn');
+
+    form.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      status.className = 'err';
+      status.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+
+      var data = Object.fromEntries(new FormData(form).entries());
+      // Normalize types
+      data.weeks_to_exam = parseInt(data.weeks_to_exam, 10);
+      data.weekly_hours  = parseInt(data.weekly_hours, 10);
+      data.has_prior_epso_experience = data.has_prior_epso_experience === 'true';
+      data.self_habits_score   = parseInt(data.self_habits_score, 10);
+      data.self_strategy_score = parseInt(data.self_strategy_score, 10);
+      data.self_eu_breadth_score = parseInt(data.self_eu_breadth_score, 10);
+      data.energy_pattern = {
+        morning: data.energy_morning,
+        afternoon: data.energy_afternoon,
+        evening: data.energy_evening,
+      };
+      delete data.energy_morning; delete data.energy_afternoon; delete data.energy_evening;
+      if (!data.last_epso_test_at) delete data.last_epso_test_at;
+
+      try {
+        var r = await fetch('/api/intake', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(data),
+        });
+        if (r.status === 401) { window.location.replace('/'); return; }
+        if (!r.ok) throw new Error((await r.text()) || 'failed');
+        window.location.replace('/me');
+      } catch (e) {
+        status.textContent = 'Could not save: ' + e.message;
+        btn.disabled = false;
+        btn.textContent = 'Build my plan';
+      }
+    });
+  </script>
+</body>
+</html>

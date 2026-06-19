@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Concourse — your profile</title>
+  <style>
+    :root {
+      --ink: #0f1d3a; --muted: #5a6b8a; --accent: #1e63d6;
+      --bg: #f7f9fc; --card: #fff; --border: #e5e9f2;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      color: var(--ink); background: var(--bg); line-height: 1.5;
+    }
+    .nav {
+      max-width: 720px; margin: 0 auto; padding: 22px 24px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .brand { font-weight: 700; font-size: 18px; }
+    .nav button {
+      background: none; border: 0; color: var(--muted); font: inherit; cursor: pointer;
+    }
+    .wrap { max-width: 720px; margin: 20px auto 80px; padding: 0 24px; }
+    h1 { font-size: 26px; margin: 0 0 8px; letter-spacing: -0.01em; }
+    .lede { color: var(--muted); margin: 0 0 22px; }
+    .card {
+      background: white; border: 1px solid var(--border);
+      border-radius: 10px; padding: 22px; margin-bottom: 16px;
+    }
+    .card h3 { margin: 0 0 12px; font-size: 16px; }
+    dl { margin: 0; display: grid; grid-template-columns: 180px 1fr; row-gap: 8px; column-gap: 16px; font-size: 14px; }
+    dt { color: var(--muted); }
+    dd { margin: 0; }
+    .pill {
+      display: inline-block; padding: 4px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 600; background: #e9efff; color: #1e63d6;
+    }
+    .stub {
+      border: 1px dashed var(--border); border-radius: 10px; padding: 18px;
+      color: var(--muted); font-size: 14px; text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="brand">Concourse</div>
+    <button id="logout">Log out</button>
+  </nav>
+
+  <main class="wrap">
+    <h1 id="greeting">Welcome.</h1>
+    <p class="lede">This is your dashboard. We will turn it into the live plan over the next sessions. For now it confirms what we know about you.</p>
+
+    <section class="card">
+      <h3>Account</h3>
+      <dl>
+        <dt>Email</dt><dd id="f-email">—</dd>
+        <dt>Joined</dt><dd id="f-created">—</dd>
+        <dt>Source</dt><dd id="f-source">—</dd>
+      </dl>
+    </section>
+
+    <section class="card">
+      <h3>Your prep <span class="pill" id="status-pill">configured</span></h3>
+      <dl>
+        <dt>Target competition</dt><dd id="f-comp">—</dd>
+        <dt>Weeks to exam</dt><dd id="f-weeks">—</dd>
+        <dt>Hours per week</dt><dd id="f-hours">—</dd>
+        <dt>Energy pattern</dt><dd id="f-energy">—</dd>
+        <dt>Prior EPSO experience</dt><dd id="f-prior">—</dd>
+        <dt>Self-rated habits</dt><dd id="f-habits">—</dd>
+        <dt>Self-rated strategy</dt><dd id="f-strat">—</dd>
+        <dt>Self-rated EU breadth</dt><dd id="f-eu">—</dd>
+      </dl>
+    </section>
+
+    <section class="stub">
+      Next session: a 5-minute calibration mini-test to set your reasoning baselines, then the first plan.
+    </section>
+  </main>
+
+  <script>
+    function fmtDate(s) {
+      if (!s) return '—';
+      try { return new Date(s).toLocaleDateString(); } catch (e) { return s; }
+    }
+    function score(n) { return n ? n + ' / 5' : '—'; }
+    function energy(o) {
+      if (!o) return '—';
+      var parts = [];
+      if (o.morning)   parts.push('morning ' + o.morning);
+      if (o.afternoon) parts.push('afternoon ' + o.afternoon);
+      if (o.evening)   parts.push('evening ' + o.evening);
+      return parts.join(' · ') || '—';
+    }
+
+    (async function load() {
+      var r = await fetch('/api/me');
+      if (r.status === 401) { window.location.replace('/'); return; }
+      var d = await r.json();
+      document.getElementById('greeting').textContent = 'Welcome, ' + (d.email || 'there') + '.';
+      document.getElementById('f-email').textContent   = d.email || '—';
+      document.getElementById('f-created').textContent = fmtDate(d.created_at);
+      document.getElementById('f-source').textContent  = d.utm_source || 'direct';
+      document.getElementById('f-comp').textContent    = d.target_competition || '—';
+      document.getElementById('f-weeks').textContent   = d.weeks_to_exam ? d.weeks_to_exam + ' weeks' : '—';
+      document.getElementById('f-hours').textContent   = d.weekly_hours ? d.weekly_hours + ' h/week' : '—';
+      document.getElementById('f-energy').textContent  = energy(d.energy_pattern);
+      document.getElementById('f-prior').textContent   = d.has_prior_epso_experience === true ? 'Yes' : (d.has_prior_epso_experience === false ? 'Not yet' : '—');
+      document.getElementById('f-habits').textContent  = score(d.self_habits_score);
+      document.getElementById('f-strat').textContent   = score(d.self_strategy_score);
+      document.getElementById('f-eu').textContent      = score(d.self_eu_breadth_score);
+
+      if (!d.target_competition) {
+        document.getElementById('status-pill').textContent = 'incomplete';
+        document.getElementById('status-pill').style.background = '#ffe4cc';
+        document.getElementById('status-pill').style.color = '#a44';
+      }
+    })();
+
+    document.getElementById('logout').addEventListener('click', async function () {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.replace('/');
+    });
+  </script>
+</body>
+</html>
