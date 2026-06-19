@@ -42,6 +42,26 @@
       border: 1px dashed var(--border); border-radius: 10px; padding: 18px;
       color: var(--muted); font-size: 14px; text-align: center;
     }
+    .cta {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px;
+    }
+    .cta .copy { flex: 1; }
+    .cta .copy h3 { margin: 0 0 4px; }
+    .cta .copy p { margin: 0; color: var(--muted); font-size: 14px; }
+    .btn {
+      padding: 10px 18px; border-radius: 8px; border: 1px solid transparent;
+      font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #174fa8; }
+    .scores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 8px; }
+    .skill-score {
+      background: #f5f7fc; border: 1px solid var(--border); border-radius: 8px; padding: 14px;
+    }
+    .skill-score .lab { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .skill-score .val { font-size: 24px; font-weight: 700; color: var(--accent); }
+    .skill-score .when { font-size: 11px; color: var(--muted); margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -77,8 +97,18 @@
       </dl>
     </section>
 
-    <section class="stub">
-      Next session: a 5-minute calibration mini-test to set your reasoning baselines, then the first plan.
+    <section class="card cta" id="diag-card">
+      <div class="copy">
+        <h3 id="diag-title">5-minute calibration check</h3>
+        <p id="diag-sub">Take a short adaptive quiz so we can baseline your verbal reasoning. Re-take any time.</p>
+      </div>
+      <a class="btn btn-primary" href="/diagnostic">Start</a>
+    </section>
+
+    <section class="card">
+      <h3>Latest scores</h3>
+      <div id="scores-empty" class="stub">No calibration data yet — start above to see your baseline.</div>
+      <div id="scores" class="scores"></div>
     </section>
   </main>
 
@@ -118,6 +148,32 @@
         document.getElementById('status-pill').textContent = 'incomplete';
         document.getElementById('status-pill').style.background = '#ffe4cc';
         document.getElementById('status-pill').style.color = '#a44';
+      }
+
+      // Latest scores
+      var scoresEl = document.getElementById('scores');
+      var emptyEl  = document.getElementById('scores-empty');
+      var skillName = {
+        verbal: 'Verbal reasoning',
+        numerical: 'Numerical reasoning',
+        abstract: 'Abstract reasoning',
+        eu_knowledge: 'EU knowledge',
+      };
+      if (d.latest_scores && d.latest_scores.length > 0) {
+        emptyEl.style.display = 'none';
+        scoresEl.innerHTML = '';
+        d.latest_scores.forEach(function (s) {
+          var div = document.createElement('div');
+          div.className = 'skill-score';
+          div.innerHTML =
+            '<div class="lab">' + (skillName[s.skill_id] || s.skill_id) + '</div>' +
+            '<div class="val">' + Math.round(s.score) + '</div>' +
+            '<div class="when">' + new Date(s.completed_at).toLocaleString() + '</div>';
+          scoresEl.appendChild(div);
+        });
+        // refine the diagnostic card copy if user already has a score
+        document.getElementById('diag-title').textContent = 'Re-calibrate any time';
+        document.getElementById('diag-sub').textContent = 'A fresh check refreshes your baseline and triggers a plan refresh.';
       }
     })();
 
