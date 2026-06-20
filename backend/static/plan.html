@@ -55,6 +55,11 @@
     <h1>Your plan</h1>
     <p class="lede">A weekly time allocation built from your measured scores and constraints, plus today's session on demand. Regenerate any time new data lands.</p>
 
+    <div id="replan-banner" class="hidden" style="background:#fdf0db;border:1px solid #f0d9a8;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <span id="replan-reason" style="font-size:14px"></span>
+      <button class="btn btn-primary" id="replan-btn">Refresh plan</button>
+    </div>
+
     <section class="card">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <h3 style="margin:0">Weekly allocation</h3>
@@ -84,6 +89,17 @@
       </div>
       <div id="tasks" style="margin-top:14px"></div>
       <div id="tasks-empty" class="stub">Generate a weekly plan first, then plan today.</div>
+    </section>
+
+    <section class="card">
+      <h3>Did you study today?</h3>
+      <div class="controls" id="adh-buttons">
+        <button class="btn btn-secondary" data-status="done">✓ Done</button>
+        <button class="btn btn-secondary" data-status="partial">◐ Partial</button>
+        <button class="btn btn-secondary" data-status="skipped">✗ Skipped</button>
+      </div>
+      <div class="muted" id="adh-today" style="margin-top:10px"></div>
+      <div class="muted" id="adh-week" style="margin-top:4px"></div>
     </section>
   </main>
 
@@ -166,12 +182,53 @@
       renderTasks(d);
     });
 
+    function renderReplan(replan) {
+      var banner = document.getElementById('replan-banner');
+      if (replan && replan.suggested) {
+        document.getElementById('replan-reason').textContent = replan.reason || 'Your plan can be refreshed.';
+        banner.dataset.trigger = replan.trigger_kind || 'manual';
+        banner.classList.remove('hidden');
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    document.getElementById('replan-btn').addEventListener('click', async function () {
+      var trigger = document.getElementById('replan-banner').dataset.trigger || 'manual';
+      var r = await fetch('/api/plan/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({trigger_kind: trigger}) });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      await load();
+    });
+
+    function renderAdherence(a) {
+      var t = a.today || {};
+      document.getElementById('adh-today').textContent = t.logged
+        ? 'Today: ' + t.status + (t.minutes_actual ? ' (' + t.minutes_actual + ' min)' : '')
+        : 'Not logged yet today.';
+      var c = (a.week && a.week.counts) || {};
+      document.getElementById('adh-week').textContent =
+        'This week — done ' + (c.done||0) + ' · partial ' + (c.partial||0) + ' · skipped ' + (c.skipped||0);
+    }
+
+    document.getElementById('adh-buttons').addEventListener('click', async function (e) {
+      var btn = e.target.closest('button[data-status]');
+      if (!btn) return;
+      var r = await fetch('/api/adherence', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status: btn.dataset.status}) });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      var d = await r.json();
+      renderAdherence({ today: d.today, week: (await (await fetch('/api/adherence')).json()).week });
+      renderReplan(d.replan);
+    });
+
     async function load() {
       var r = await fetch('/api/plan');
       if (r.status === 401) { window.location.replace('/'); return; }
       var d = await r.json();
       renderAllocation(d.master);
+      renderReplan(d.replan);
       genBtn.disabled = false;
+      var a = await (await fetch('/api/adherence')).json();
+      renderAdherence(a);
     }
     load();
   </script>

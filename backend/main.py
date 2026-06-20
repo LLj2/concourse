@@ -14,6 +14,7 @@ from backend.db.database import get_db
 from backend.logic import diagnostic as dx
 from backend.logic import scoring as sc
 from backend.logic import planning as pl
+from backend.logic import adherence as ad
 from backend.ai import client as ai
 
 app = FastAPI(title="Concourse", version="0.1.0")
@@ -306,8 +307,11 @@ def get_plan(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Active master plan (or null if none yet)."""
-    return {"master": pl.active_master_plan(db, user["user_id"])}
+    """Active master plan (or null if none yet) + event-driven replan signal."""
+    return {
+        "master": pl.active_master_plan(db, user["user_id"]),
+        "replan": ad.replan_signal(db, user["user_id"]),
+    }
 
 
 @app.post("/api/plan/generate")
@@ -340,3 +344,41 @@ def post_plan_daily(
         except (TypeError, ValueError):
             raise HTTPException(status_code=400, detail="invalid_minutes")
     return pl.generate_daily_plan(db, user["user_id"], minutes_available=minutes, energy=energy)
+
+
+# ---------- adherence API (Session 8 — logging layer C) ----------
+
+@app.get("/api/adherence")
+def get_adherence(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Today's adherence + a 7-day summary."""
+    return {
+        "today": ad.today_status(db, user["user_id"]),
+        "week": ad.week_summary(db, user["user_id"]),
+    }
+
+
+@app.post("/api/adherence")
+def post_adherence(
+    payload: dict = Body(...),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """One-tap daily confirmation. Body: {status, minutes?, note?, plan_id?}"""
+    status = payload.get("status")
+    if status not in ad.VALID_STATUS:
+        raise HTTPException(status_code=400, detail="invalid_status")
+    minutes = payload.get("minutes")
+    if minutes is not None:
+        try:
+            minutes = int(minutes)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="invalid_minutes")
+    today = ad.log_adherence(
+        db, user["user_id"], status,
+        minutes_actual=minutes, note=payload.get("note"), plan_id=payload.get("plan_id"),
+    )
+    # Surface whether this changes the replan picture (e.g. weekly floor breached).
+    return {"today": today, "replan": ad.replan_signal(db, user["user_id"])}
