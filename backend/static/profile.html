@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Concourse — your profile</title>
+  <style>
+    :root {
+      --ink: #0f1d3a; --muted: #5a6b8a; --accent: #1e63d6;
+      --bg: #f7f9fc; --card: #fff; --border: #e5e9f2;
+      --ok: #137a3b; --warn: #a8660a; --err: #c03;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      color: var(--ink); background: var(--bg); line-height: 1.55;
+    }
+    .nav {
+      max-width: 720px; margin: 0 auto; padding: 22px 24px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .brand { font-weight: 700; font-size: 18px; }
+    .nav a { color: var(--muted); text-decoration: none; font-size: 14px; }
+    .wrap { max-width: 720px; margin: 12px auto 80px; padding: 0 24px; }
+    h1 { font-size: 26px; margin: 0 0 8px; letter-spacing: -0.01em; }
+    .lede { color: var(--muted); margin: 0 0 22px; }
+    .card {
+      background: white; border: 1px solid var(--border);
+      border-radius: 10px; padding: 22px; margin-bottom: 16px;
+    }
+    .card h3 { margin: 0 0 14px; font-size: 16px; }
+    .scores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .skill {
+      background: #f5f7fc; border: 1px solid var(--border); border-radius: 8px; padding: 14px;
+    }
+    .skill .lab { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .skill .val { font-size: 26px; font-weight: 700; color: var(--accent); }
+    .skill .val.unmeasured { color: var(--muted); font-size: 15px; font-weight: 600; }
+    .bar { height: 6px; background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+    .bar > i { display: block; height: 100%; background: var(--accent); }
+    dl { margin: 0; display: grid; grid-template-columns: 180px 1fr; row-gap: 8px; column-gap: 16px; font-size: 14px; }
+    dt { color: var(--muted); }
+    dd { margin: 0; }
+    .btn {
+      padding: 10px 18px; border-radius: 8px; border: 1px solid transparent;
+      font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #174fa8; }
+    .btn-primary:disabled { background: #aab; cursor: not-allowed; }
+    .btn-secondary { background: white; color: var(--ink); border-color: var(--border); }
+    .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .pill.on_track { background: #e3f6ea; color: var(--ok); }
+    .pill.tight { background: #fdf0db; color: var(--warn); }
+    .pill.at_risk { background: #fde4e4; color: var(--err); }
+    .insight ul { margin: 6px 0 14px; padding-left: 18px; }
+    .insight li { font-size: 14px; margin-bottom: 4px; }
+    .insight .summary { font-size: 15px; margin: 0 0 14px; }
+    .insight .note { font-size: 14px; color: var(--muted); border-left: 3px solid var(--border); padding-left: 12px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .stub { border: 1px dashed var(--border); border-radius: 10px; padding: 18px; color: var(--muted); font-size: 14px; text-align: center; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .msg { font-size: 13px; margin-top: 10px; }
+    .msg.err { color: var(--err); }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="brand">Concourse</div>
+    <a href="/me">← Dashboard</a>
+  </nav>
+
+  <main class="wrap">
+    <h1>Your profile</h1>
+    <p class="lede">Measured reasoning, your self-assessment, and an AI read of where to focus. Numbers come from real tests; the read is generated from them.</p>
+
+    <section class="card">
+      <h3>Measured reasoning</h3>
+      <div id="scores" class="scores"></div>
+      <p id="scores-empty" class="stub hidden">No measured scores yet. <a href="/diagnostic">Take a calibration check</a> to baseline your verbal reasoning.</p>
+    </section>
+
+    <section class="card">
+      <h3>Self-assessment & constraints</h3>
+      <dl id="self-dl"></dl>
+    </section>
+
+    <section class="card insight">
+      <h3>AI read <span id="gng" class="pill hidden"></span></h3>
+      <div id="insight-body">
+        <p class="muted" id="insight-empty">No insights generated yet.</p>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn btn-primary" id="gen-btn">Generate insights</button>
+        <span class="muted" id="gen-when"></span>
+      </div>
+      <div class="msg" id="gen-msg"></div>
+    </section>
+  </main>
+
+  <script>
+    var SKILL_ORDER = ['verbal', 'numerical', 'abstract', 'eu_knowledge'];
+    var SKILL_LABEL = {
+      verbal: 'Verbal reasoning', numerical: 'Numerical reasoning',
+      abstract: 'Abstract reasoning', eu_knowledge: 'EU knowledge',
+    };
+
+    function renderScores(measured) {
+      var el = document.getElementById('scores');
+      var empty = document.getElementById('scores-empty');
+      el.innerHTML = '';
+      var any = false;
+      SKILL_ORDER.forEach(function (sk) {
+        var m = measured[sk];
+        var div = document.createElement('div');
+        div.className = 'skill';
+        if (m && m.score !== null && m.score !== undefined) {
+          any = true;
+          var v = Math.round(m.score);
+          div.innerHTML =
+            '<div class="lab">' + SKILL_LABEL[sk] + '</div>' +
+            '<div class="val">' + v + '</div>' +
+            '<div class="bar"><i style="width:' + v + '%"></i></div>';
+        } else {
+          div.innerHTML =
+            '<div class="lab">' + SKILL_LABEL[sk] + '</div>' +
+            '<div class="val unmeasured">Not measured</div>';
+        }
+        el.appendChild(div);
+      });
+      empty.classList.toggle('hidden', any);
+    }
+
+    function renderSelf(p) {
+      var s = p.self_rated || {}, c = p.constraints || {};
+      function likert(n) { return (n || n === 0) ? n + ' / 5' : '—'; }
+      var rows = [
+        ['Target competition', c.target_competition || '—'],
+        ['Weeks to exam', c.weeks_to_exam ? c.weeks_to_exam + ' weeks' : '—'],
+        ['Hours per week', c.weekly_hours ? c.weekly_hours + ' h' : '—'],
+        ['Prior EPSO experience', c.has_prior_epso_experience === true ? 'Yes' : (c.has_prior_epso_experience === false ? 'Not yet' : '—')],
+        ['Self-rated habits', likert(s.habits)],
+        ['Self-rated strategy', likert(s.strategy)],
+        ['Self-rated EU breadth', likert(s.eu_breadth)],
+      ];
+      var dl = document.getElementById('self-dl');
+      dl.innerHTML = '';
+      rows.forEach(function (r) {
+        dl.innerHTML += '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>';
+      });
+    }
+
+    function renderNarrative(n, when) {
+      var body = document.getElementById('insight-body');
+      var gng = document.getElementById('gng');
+      if (!n) { return; }
+      var html = '<p class="summary">' + n.summary + '</p>';
+      if (n.strengths && n.strengths.length) {
+        html += '<strong>Strengths</strong><ul>' + n.strengths.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
+      }
+      if (n.focus_areas && n.focus_areas.length) {
+        html += '<strong>Focus next</strong><ul>' + n.focus_areas.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
+      }
+      if (n.strategy_note) html += '<p class="note">' + n.strategy_note + '</p>';
+      body.innerHTML = html;
+      if (n.go_no_go) {
+        gng.className = 'pill ' + n.go_no_go;
+        gng.textContent = { on_track: 'On track', tight: 'Tight', at_risk: 'At risk' }[n.go_no_go] || n.go_no_go;
+        gng.classList.remove('hidden');
+      }
+      if (when) document.getElementById('gen-when').textContent = 'Generated ' + new Date(when).toLocaleString();
+    }
+
+    var genBtn = document.getElementById('gen-btn');
+
+    async function generate() {
+      var msg = document.getElementById('gen-msg');
+      msg.textContent = ''; msg.className = 'msg';
+      genBtn.disabled = true; genBtn.textContent = 'Generating…';
+      try {
+        var r = await fetch('/api/profile/narrate', { method: 'POST' });
+        if (r.status === 401) { window.location.replace('/'); return; }
+        if (!r.ok) {
+          var detail = await r.text();
+          if (r.status === 400) throw new Error('Complete your intake first.');
+          throw new Error(detail);
+        }
+        var data = await r.json();
+        renderNarrative(data.narrative, new Date().toISOString());
+        genBtn.textContent = 'Regenerate';
+      } catch (e) {
+        msg.className = 'msg err';
+        msg.textContent = 'Could not generate: ' + e.message;
+        genBtn.textContent = 'Generate insights';
+      } finally {
+        genBtn.disabled = false;
+      }
+    }
+    genBtn.addEventListener('click', generate);
+
+    (async function load() {
+      var r = await fetch('/api/profile');
+      if (r.status === 401) { window.location.replace('/'); return; }
+      var d = await r.json();
+      renderScores(d.profile.measured || {});
+      renderSelf(d.profile);
+      if (d.narrative) {
+        document.getElementById('insight-empty').remove();
+        renderNarrative(d.narrative, d.narrative_generated_at);
+        genBtn.textContent = 'Regenerate';
+      }
+      if (!d.ai_configured) {
+        genBtn.disabled = true;
+        document.getElementById('gen-msg').textContent = 'AI not configured on this environment.';
+      }
+    })();
+  </script>
+</body>
+</html>

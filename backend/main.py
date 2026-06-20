@@ -12,6 +12,10 @@ from backend.config import settings
 from backend.auth import router as auth_router, get_current_user, get_optional_user
 from backend.db.database import get_db
 from backend.logic import diagnostic as dx
+from backend.logic import scoring as sc
+from backend.logic import planning as pl
+from backend.logic import adherence as ad
+from backend.ai import client as ai
 
 app = FastAPI(title="Concourse", version="0.1.0")
 
@@ -68,6 +72,16 @@ def me_page(user: dict = Depends(get_current_user)):
 @app.get("/diagnostic")
 def diagnostic_page(user: dict = Depends(get_current_user)):
     return FileResponse(STATIC_DIR / "diagnostic.html")
+
+
+@app.get("/profile")
+def profile_page(user: dict = Depends(get_current_user)):
+    return FileResponse(STATIC_DIR / "profile.html")
+
+
+@app.get("/plan")
+def plan_page(user: dict = Depends(get_current_user)):
+    return FileResponse(STATIC_DIR / "plan.html")
 
 
 # ---------- intake API ----------
@@ -247,3 +261,124 @@ def diagnostic_answer(
             "options": next_item.options,
         },
     }
+
+
+# ---------- profile / scoring API (Session 4) ----------
+
+@app.get("/api/profile")
+def get_profile(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Computed profile (measured + self-rated + constraints) plus any cached
+    LLM narrative. No LLM call here — cheap, safe to poll."""
+    profile = sc.build_profile(db, user["user_id"])
+    cached = sc.latest_narrative(db, user["user_id"])
+    return {
+        "profile": profile,
+        "narrative": cached["narrative"] if cached else None,
+        "narrative_generated_at": cached["generated_at"] if cached else None,
+        "ai_configured": ai.is_configured(),
+    }
+
+
+@app.post("/api/profile/narrate")
+def narrate_profile(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate (and cache) a JSON-schema-validated LLM narrative of the profile."""
+    if not ai.is_configured():
+        raise HTTPException(status_code=503, detail="ai_not_configured")
+    profile = sc.build_profile(db, user["user_id"])
+    if not profile["constraints"].get("target_competition"):
+        raise HTTPException(status_code=400, detail="intake_incomplete")
+    try:
+        narrative = sc.generate_narrative(db, user["user_id"], profile)
+    except Exception as e:  # transport / model error -> clean 502, not a 500 crash
+        raise HTTPException(status_code=502, detail=f"ai_failed: {e}")
+    return {"narrative": narrative}
+
+
+# ---------- plan API (Sessions 6-7) ----------
+
+@app.get("/api/plan")
+def get_plan(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Active master plan (or null if none yet) + event-driven replan signal."""
+    return {
+        "master": pl.active_master_plan(db, user["user_id"]),
+        "replan": ad.replan_signal(db, user["user_id"]),
+    }
+
+
+@app.post("/api/plan/generate")
+def post_plan_generate(
+    payload: dict = Body(default={}),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """(Re)generate the master plan. Rule-based allocation; LLM rationale is
+    best-effort. Requires a completed intake."""
+    profile = sc.build_profile(db, user["user_id"])
+    if not profile["constraints"].get("target_competition"):
+        raise HTTPException(status_code=400, detail="intake_incomplete")
+    trigger = payload.get("trigger_kind", "manual")
+    return pl.generate_master_plan(db, user["user_id"], trigger_kind=trigger)
+
+
+@app.post("/api/plan/daily")
+def post_plan_daily(
+    payload: dict = Body(default={}),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Today's session from the active master allocation."""
+    minutes = payload.get("minutes")
+    energy = payload.get("energy", "medium")
+    if minutes is not None:
+        try:
+            minutes = int(minutes)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="invalid_minutes")
+    return pl.generate_daily_plan(db, user["user_id"], minutes_available=minutes, energy=energy)
+
+
+# ---------- adherence API (Session 8 — logging layer C) ----------
+
+@app.get("/api/adherence")
+def get_adherence(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Today's adherence + a 7-day summary."""
+    return {
+        "today": ad.today_status(db, user["user_id"]),
+        "week": ad.week_summary(db, user["user_id"]),
+    }
+
+
+@app.post("/api/adherence")
+def post_adherence(
+    payload: dict = Body(...),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """One-tap daily confirmation. Body: {status, minutes?, note?, plan_id?}"""
+    status = payload.get("status")
+    if status not in ad.VALID_STATUS:
+        raise HTTPException(status_code=400, detail="invalid_status")
+    minutes = payload.get("minutes")
+    if minutes is not None:
+        try:
+            minutes = int(minutes)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="invalid_minutes")
+    today = ad.log_adherence(
+        db, user["user_id"], status,
+        minutes_actual=minutes, note=payload.get("note"), plan_id=payload.get("plan_id"),
+    )
+    # Surface whether this changes the replan picture (e.g. weekly floor breached).
+    return {"today": today, "replan": ad.replan_signal(db, user["user_id"])}
