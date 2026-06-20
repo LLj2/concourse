@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from backend.config import settings
 from backend.auth import router as auth_router, get_current_user, get_optional_user
 from backend.db.database import get_db
+from backend.logic import diagnostic as dx
 
 app = FastAPI(title="Concourse", version="0.1.0")
 
@@ -62,6 +63,11 @@ def intake_page(user: dict = Depends(get_current_user)):
 @app.get("/me")
 def me_page(user: dict = Depends(get_current_user)):
     return FileResponse(STATIC_DIR / "me.html")
+
+
+@app.get("/diagnostic")
+def diagnostic_page(user: dict = Depends(get_current_user)):
+    return FileResponse(STATIC_DIR / "diagnostic.html")
 
 
 # ---------- intake API ----------
@@ -147,4 +153,97 @@ def get_me(
     ).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="user_not_found")
-    return JSONResponse(content=dict(row), media_type="application/json")
+
+    # Latest completed diagnostic score per skill, for the dashboard
+    scores = db.execute(
+        text(
+            """
+            select distinct on (skill_id)
+                skill_id, score, completed_at
+            from diagnostic_sessions
+            where user_id = :u and completed_at is not null
+            order by skill_id, completed_at desc
+            """
+        ),
+        {"u": user["user_id"]},
+    ).mappings().all()
+
+    payload = dict(row)
+    payload["latest_scores"] = [dict(s) for s in scores]
+    # Return a plain dict so FastAPI's jsonable_encoder handles UUID/datetime/Decimal.
+    return payload
+
+
+# ---------- diagnostic API ----------
+
+@app.post("/api/diagnostic/start")
+def diagnostic_start(
+    payload: dict = Body(...),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Begin a diagnostic session. Body: {skill_id, kind?}"""
+    skill_id = payload.get("skill_id")
+    if skill_id not in ("verbal", "numerical", "abstract", "eu_knowledge"):
+        raise HTTPException(status_code=400, detail="invalid_skill_id")
+    kind = payload.get("kind") or "periodic"
+    session_id = dx.start_session(db, user["user_id"], skill_id, kind)
+    item = dx.pick_next_item(db, session_id)
+    if item is None:
+        # no items in bank for this skill yet
+        raise HTTPException(status_code=409, detail="no_items_available")
+    return {
+        "session_id": session_id,
+        "item": {
+            "item_id": item.item_id,
+            "difficulty": item.difficulty,
+            "prompt": item.prompt,
+            "options": item.options,
+        },
+        "progress": {"answered": 0, "target": dx.TARGET_ITEMS},
+    }
+
+
+@app.post("/api/diagnostic/answer")
+def diagnostic_answer(
+    payload: dict = Body(...),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Submit an answer. Body: {session_id, item_id, selected_index, time_taken_ms?}"""
+    session_id = payload.get("session_id")
+    item_id = payload.get("item_id")
+    selected_index = payload.get("selected_index")
+    time_taken_ms = payload.get("time_taken_ms")
+
+    if not session_id or not item_id or selected_index is None:
+        raise HTTPException(status_code=400, detail="missing_fields")
+
+    # Confirm session belongs to this user (prevent cross-user writes)
+    sess = db.execute(
+        text("select user_id from diagnostic_sessions where id = :s"),
+        {"s": session_id},
+    ).first()
+    if sess is None or str(sess[0]) != user["user_id"]:
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    result = dx.record_answer(db, session_id, item_id, int(selected_index), time_taken_ms)
+
+    next_item = dx.pick_next_item(db, session_id)
+    if next_item is None:
+        final = dx.finalize_session(db, session_id)
+        return {
+            "feedback": result,
+            "done": True,
+            "final": final,
+        }
+    return {
+        "feedback": result,
+        "done": False,
+        "next_item": {
+            "item_id": next_item.item_id,
+            "difficulty": next_item.difficulty,
+            "prompt": next_item.prompt,
+            "options": next_item.options,
+        },
+    }
