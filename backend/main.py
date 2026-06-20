@@ -12,6 +12,8 @@ from backend.config import settings
 from backend.auth import router as auth_router, get_current_user, get_optional_user
 from backend.db.database import get_db
 from backend.logic import diagnostic as dx
+from backend.logic import scoring as sc
+from backend.ai import client as ai
 
 app = FastAPI(title="Concourse", version="0.1.0")
 
@@ -68,6 +70,11 @@ def me_page(user: dict = Depends(get_current_user)):
 @app.get("/diagnostic")
 def diagnostic_page(user: dict = Depends(get_current_user)):
     return FileResponse(STATIC_DIR / "diagnostic.html")
+
+
+@app.get("/profile")
+def profile_page(user: dict = Depends(get_current_user)):
+    return FileResponse(STATIC_DIR / "profile.html")
 
 
 # ---------- intake API ----------
@@ -247,3 +254,40 @@ def diagnostic_answer(
             "options": next_item.options,
         },
     }
+
+
+# ---------- profile / scoring API (Session 4) ----------
+
+@app.get("/api/profile")
+def get_profile(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Computed profile (measured + self-rated + constraints) plus any cached
+    LLM narrative. No LLM call here — cheap, safe to poll."""
+    profile = sc.build_profile(db, user["user_id"])
+    cached = sc.latest_narrative(db, user["user_id"])
+    return {
+        "profile": profile,
+        "narrative": cached["narrative"] if cached else None,
+        "narrative_generated_at": cached["generated_at"] if cached else None,
+        "ai_configured": ai.is_configured(),
+    }
+
+
+@app.post("/api/profile/narrate")
+def narrate_profile(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate (and cache) a JSON-schema-validated LLM narrative of the profile."""
+    if not ai.is_configured():
+        raise HTTPException(status_code=503, detail="ai_not_configured")
+    profile = sc.build_profile(db, user["user_id"])
+    if not profile["constraints"].get("target_competition"):
+        raise HTTPException(status_code=400, detail="intake_incomplete")
+    try:
+        narrative = sc.generate_narrative(db, user["user_id"], profile)
+    except Exception as e:  # transport / model error -> clean 502, not a 500 crash
+        raise HTTPException(status_code=502, detail=f"ai_failed: {e}")
+    return {"narrative": narrative}
