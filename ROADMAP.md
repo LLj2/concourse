@@ -44,9 +44,12 @@ The architectural keystone (fixes Risks 1, 3, 5 at once): **the product measures
 | Session 1 | Foundations: FastAPI, Supabase pooler, schema, landing + PostHog/UTM | ✅ Done |
 | Session 2 | Auth (magic-link), intake form, `/me` | ✅ Done |
 | Session 3 | Diagnostic engine v0 — adaptive verbal mini-test | ✅ Done & deployed (2026-06-20) |
-| Session 4 | Scoring + profile rendering | ⏭️ **Next** |
-| Sessions 5–8 | Plan generation, daily plan, logging A+C, weekly re-plan | ⬜ Not started |
-| Session 9 | Stripe trial + paywall + funnel instrumentation | ⬜ Not started |
+| Session 4 | Scoring + profile + first JSON-schema-validated LLM call | ✅ Done (2026-06-20) |
+| Sessions 6–7 | Plan generation (master + daily rule engine) | ✅ Done (2026-06-20) |
+| Session 8 | Logging layer C (adherence) + event-driven replan | ✅ Done (2026-06-20) |
+| Diagnostic breadth | Numerical/abstract/EU item banks | ⛔ Blocked — source-vs-author decision (#5) |
+| Session 9 | Stripe trial + paywall + funnel instrumentation | ⛔ Blocked — Stripe account/owner (#4) |
+| Layer B | Screenshot/paste → LLM parse | ⬜ Deferred ("only if time allows") |
 | Pilot | Closed pilot (10–30 users), watch week-3 retention | ⬜ Not started |
 | Launch | Public launch for AD5/AD7 wave, turn on paid channels | ⬜ Not started |
 
@@ -82,29 +85,33 @@ The architectural keystone (fixes Risks 1, 3, 5 at once): **the product measures
 
 Sequencing follows `EPSO-Planner-MVP-Build-Plan.md §6`. The credibility-critical pieces (diagnostics → scoring → plan generation) are front-loaded; polish is deferred.
 
-### Session 4 — Scoring + profile  ⏭️ NEXT
-- [ ] Combine measured reasoning score + Likert self-scores + CV-fit modifier into a profile view.
-- [ ] First **LLM call** (Anthropic Haiku 4.5) for soft dimensions, wrapped in a typed function with **JSON-schema validation + logging** (per build plan §5 and Giovanni's PR note).
-- [ ] CV-fit = one-time intake **strategy modifier** + go/no-go note only (Risk 2 mitigation). Not a daily driver.
-- [ ] Profile visualization on `/me`.
+### Session 4 — Scoring + profile  ✅ DONE (2026-06-20)
+- [x] Combine measured reasoning score + Likert self-scores + constraints into a profile view (`backend/logic/scoring.py`, `/profile`).
+- [x] First **LLM call** (Anthropic Haiku 4.5) via `backend/ai/client.py` `generate_json()` — forced tool call = **JSON-schema-validated** output; narrative cached as a `profile_generated` event.
+- [x] Measured numbers stay measured; LLM only narrates (Risk-3 fix). go/no-go read included.
+- [~] CV-fit strategy modifier — deferred: no CV upload exists yet. The LLM narrative covers the go/no-go read; CV-fit lands when CV upload is built.
+- [x] Profile visualization (`/profile`, linked from `/me`).
 
-### Diagnostic breadth (build plan §4.2 — beyond verbal v0)
-- [ ] Numerical reasoning items + harness.
-- [ ] Abstract reasoning items + harness.
+### Diagnostic breadth (build plan §4.2 — beyond verbal v0)  ⛔ blocked
+The adaptive engine already handles any `skill_id`; it just needs calibrated item banks.
+- [ ] Numerical reasoning items.
+- [ ] Abstract reasoning items.
 - [ ] Short EU-knowledge quiz.
-- [ ] Reach ~15–25 calibrated items **per reasoning skill** for steady state (8 verbal shipped is enough to demo, not to run).
-- [ ] **Decision: source vs. author items** (licensed = fast but costs/constrains; authored = free but slow). This is the credibility bottleneck — see Open Decisions.
+- [ ] Reach ~15–25 calibrated items **per reasoning skill** (8 verbal shipped is enough to demo, not to run).
+- [ ] **Decision: source vs. author items** → **issue #5**. The credibility bottleneck.
 
-### Sessions 6–7 — Plan generation
-- [ ] Master plan: rule engine over scores × weights × time-to-exam × weekly hours × energy → per-skill weekly allocation (minutes/week).
-- [ ] On-demand daily plan: time + energy → today's session.
-- [ ] LLM-narrated rationale (`rationale_md`) — "plan updated because X".
+### Sessions 6–7 — Plan generation  ✅ DONE (2026-06-20)
+- [x] Master plan: rule engine over score gaps × soft dims × time-to-exam tilt × weekly hours → per-area weekly minutes (`backend/logic/planning.py`, sums exactly to budget).
+- [x] On-demand daily plan: available minutes + energy → today's ordered task list.
+- [x] LLM-narrated `rationale_md` (schema-validated, best-effort — never blocks generation).
+- [x] Supersede-on-regenerate (exactly one active master plan); `/plan` page.
 
-### Session 8 — Logging layers + re-planning
-- [ ] **Layer A** (the spine): weekly in-app micro-diagnostic feeding re-planning. (Session 3 is the first instance of this.)
-- [ ] **Layer C** (habit hook): one-tap daily adherence (👍 / partial / ✗ + optional numeric).
-- [ ] Weekly automated **re-planning** from diagnostic + adherence data (event-driven via `plans.trigger_kind`).
-- [ ] **Layer B** (convenience, only if time allows): screenshot/paste → LLM parse of EUTraining/ORSEU/EPSOready results into `external_logs`. **Never let the loop depend on B or C.**
+### Session 8 — Logging layers + re-planning  ✅ DONE (2026-06-20)
+- [x] **Layer A** (the spine): weekly in-app micro-diagnostic feeding re-planning (Session 3 is the first instance).
+- [x] **Layer C** (habit hook): one-tap daily adherence (done/partial/skipped + optional minutes/note), `backend/logic/adherence.py`.
+- [x] **Event-driven re-planning**: `replan_signal()` suggests a refresh on new diagnostic or weekly-floor breach, surfaced in `GET /api/plan`; regenerate is explicit with the right `trigger_kind`.
+- [ ] **Automated weekly cron** for re-planning — deferred (infra; current model is event-driven/on-demand).
+- [ ] **Layer B** (convenience, only if time allows): screenshot/paste → LLM parse into `external_logs`. **Never let the loop depend on B or C.**
 
 ### Session 9 — Payments + funnel
 - [ ] Stripe: single plan **24.99 €/mo**, **7-day trial, card required up front**. No 3-month prepay bundle yet (muddies the monthly signal).
