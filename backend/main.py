@@ -13,6 +13,7 @@ from backend.auth import router as auth_router, get_current_user, get_optional_u
 from backend.db.database import get_db
 from backend.logic import diagnostic as dx
 from backend.logic import scoring as sc
+from backend.logic import planning as pl
 from backend.ai import client as ai
 
 app = FastAPI(title="Concourse", version="0.1.0")
@@ -75,6 +76,11 @@ def diagnostic_page(user: dict = Depends(get_current_user)):
 @app.get("/profile")
 def profile_page(user: dict = Depends(get_current_user)):
     return FileResponse(STATIC_DIR / "profile.html")
+
+
+@app.get("/plan")
+def plan_page(user: dict = Depends(get_current_user)):
+    return FileResponse(STATIC_DIR / "plan.html")
 
 
 # ---------- intake API ----------
@@ -291,3 +297,46 @@ def narrate_profile(
     except Exception as e:  # transport / model error -> clean 502, not a 500 crash
         raise HTTPException(status_code=502, detail=f"ai_failed: {e}")
     return {"narrative": narrative}
+
+
+# ---------- plan API (Sessions 6-7) ----------
+
+@app.get("/api/plan")
+def get_plan(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Active master plan (or null if none yet)."""
+    return {"master": pl.active_master_plan(db, user["user_id"])}
+
+
+@app.post("/api/plan/generate")
+def post_plan_generate(
+    payload: dict = Body(default={}),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """(Re)generate the master plan. Rule-based allocation; LLM rationale is
+    best-effort. Requires a completed intake."""
+    profile = sc.build_profile(db, user["user_id"])
+    if not profile["constraints"].get("target_competition"):
+        raise HTTPException(status_code=400, detail="intake_incomplete")
+    trigger = payload.get("trigger_kind", "manual")
+    return pl.generate_master_plan(db, user["user_id"], trigger_kind=trigger)
+
+
+@app.post("/api/plan/daily")
+def post_plan_daily(
+    payload: dict = Body(default={}),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Today's session from the active master allocation."""
+    minutes = payload.get("minutes")
+    energy = payload.get("energy", "medium")
+    if minutes is not None:
+        try:
+            minutes = int(minutes)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="invalid_minutes")
+    return pl.generate_daily_plan(db, user["user_id"], minutes_available=minutes, energy=energy)
