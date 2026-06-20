@@ -1,7 +1,7 @@
 # Concourse — Handoff
 
 > **Audience:** Leonardo (new owner) and Stefano (collaborator), picking up a working scaffold from Giovanni.
-> **Last updated:** 2026-06-19
+> **Last updated:** 2026-06-20
 > **Stack mirrors:** [`dora-mvp`](https://github.com/giovannifoglietta/dora-mvp) and [`quizventure`](https://github.com/giovannifoglietta/quizventure) — same Python 3 / FastAPI / Supabase pooler / Anthropic SDK / Railway auto-deploy / hand-rolled HTML pattern. No new toolchain.
 
 ## 1. The product, in one paragraph
@@ -146,25 +146,36 @@ git config user.name "Your Name"
 git config user.email "your@email.com"
 ```
 
+### Current workflow — MVP phase, before public launch
+
+We are deliberately keeping this **lightweight to move fast**: no pull requests and no required approvals. You work on a branch and merge it into `main` yourself when it's ready. (Branches still matter — they let the three of us work in parallel and keep `main` deployable.)
+
 **Per-feature workflow:**
 ```bash
-# at the start of a feature
+# start of a feature
 git fetch origin
 git checkout main
 git pull
 git checkout -b leonardo/diagnostic-engine    # or stefano/... or giovanni/...
 
 # work with Claude Code, commit often
-git push -u origin leonardo/diagnostic-engine
 
-# open a PR on GitHub, ask others to review
-# merge to main when approved (squash-merge keeps history clean)
+# when it's ready, merge it into main yourself and push
+git checkout main
+git pull
+git merge leonardo/diagnostic-engine
+git push origin main          # pushing to main auto-deploys to Railway (~2 min)
 ```
 
-**Two rules to avoid stepping on each other:**
+You don't need to memorize the git — just tell Claude *"merge my branch into main and push."*
 
-1. **Never commit directly to `main`.** Always a PR. Saves a lot of trouble.
-2. **Coordinate in WhatsApp / Slack on which area each person is touching** — "Leo on diagnostics, Giovanni on Stripe, Stefano on item bank." Conflicts are recoverable but waste time.
+**Small or urgent changes** — a hotfix, a copy tweak, a config change — can go **straight to `main` without a branch**. Do it with care: a push to `main` is live in ~2 minutes with no second look. If unsure, ask Claude to sanity-check the diff first.
+
+**Reviewing is optional but encouraged for anything non-trivial.** You don't have to read code — point Claude at your branch or diff and ask it to review before you merge.
+
+**Coordinate offline *before* you start.** Since nothing gates a merge now, a quick WhatsApp — "I'm taking diagnostics", "I've got Stripe", "I'm on the item bank" — is what keeps two of us from editing the same files at once. Conflicts are recoverable but waste time.
+
+> ⚠️ **This is temporary, by agreement.** It optimizes for speed during the MVP build. **Before we go live with real users we will revisit this** and bring back a heavier process — pull requests plus at least one review (4 eyes), likely enforced with branch protection on `main`. Until then: branch, merge, ship.
 
 **Tell Claude at the start of each session** which branch you are on and what the goal is. Example: *"I am Leonardo on branch `leonardo/diagnostic-engine`. Today: implement the 5-7 item adaptive harness for verbal reasoning. We have items in the `items` table, skill_id='verbal', difficulty 1-3."*
 
