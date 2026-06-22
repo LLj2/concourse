@@ -53,6 +53,33 @@ Category node ids: `13571` AD5 · `13572` AD6-9 · `13624` AST · `13568` AST/SC
 Re-running reuses `raw_embeds/` as a cache, so it won't re-hit the server for
 content already fetched.
 
+## News / notices / analysis scraper (`news_scrape.py`)
+
+Extends the tool beyond reasoning *samples* to the surrounding editorial text —
+official EPSO competition notices/news plus third-party analyses (the "ingest
+concourses text / analyses / news" item from #product). Scoped as an **extension
+of the internal calibration tool**, not user-facing content.
+
+```bash
+venv/Scripts/python.exe tools/epso_benchmark/news_scrape.py                 # all enabled sources
+venv/Scripts/python.exe tools/epso_benchmark/news_scrape.py --source epso    # one source
+venv/Scripts/python.exe tools/epso_benchmark/news_scrape.py --source orseu --max-articles 20
+```
+
+| source | where | status |
+|---|---|---|
+| `epso` | `eu-careers.europa.eu/en/news` (notices + news) | enabled |
+| `orseu` | `orseu-concours.com/fr/blog` | enabled |
+| `europapp` | `europapp.eu` blog sitemaps (EN + ES) | enabled |
+| `eutraining` | `eutraining.eu` | **disabled** — robots.txt disallows AI bots + `ai-train=no`, Cloudflare 403 to non-browser UAs. Not scraped pending a separate decision. |
+
+- Honours each host's `robots.txt` (stdlib `urllib.robotparser`); disallowed URLs
+  are skipped, not fetched. Same polite `Crawler` as `scrape.py`.
+- Output under `data/news/`: `articles.json`, `summary.md`, `raw/<source>/*.html`
+  (raw cache = audit trail + offline re-parse). The article-link regexes are
+  permissive and may need a tweak after the first live run (every URL is validated
+  by the extractor, so over-capture is harmless).
+
 ## Scope & ethics — read before sharing output
 
 - EPSO marks these samples *"for illustration purposes only … not training
