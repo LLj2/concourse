@@ -39,3 +39,7 @@ htmlcov/
 
 # OS
 Thumbs.db
+
+# EPSO benchmark scrape output — internal calibration only, do NOT commit
+# (scraped sample-question text is EPSO content marked "not training materials")
+tools/epso_benchmark/data/
