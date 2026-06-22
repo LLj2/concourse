@@ -118,10 +118,12 @@ create index idx_pattern_user_skill on pattern_analyses(user_id, skill_id, gener
 
 **What lands:**
 
-- `backend/ai/generate_item.py` — single function `generate_item(skill_id, difficulty, target_dimensions, recent_topic_tags, content_domain=None)` returning a validated item dict.
-- `backend/ai/prompts/` directory — one prompt file per skill (`verbal.py`, `numerical.py`, etc.), holding the system prompt + few-shot examples + the per-skill dimension schema.
-- `backend/ai/item_schema.py` — the JSON schema each skill's output must match (programmatic, generated from `COGNITIVE_DIMENSIONS.md`).
+- `backend/compass/generate_item.py` — single function `generate_item(skill_id, difficulty, target_dimensions, recent_topic_tags, content_domain=None)` returning a validated item dict.
+- `backend/compass/prompts/` directory — one prompt file per skill (`verbal.py`, `numerical.py`, etc.), holding the system prompt + few-shot examples + the per-skill dimension schema.
+- `backend/compass/item_schema.py` — the JSON schema each skill's output must match (programmatic, generated from `COGNITIVE_DIMENSIONS.md`).
 - A `scripts/test_generate.py` CLI for prompt iteration.
+
+> All Compass code lives under `backend/compass/` per the isolation contract (`backend/compass/README.md`). The legacy `backend/ai/client.py` is reused as a dependency (it's the generic Anthropic wrapper), but everything Compass-specific is in the sealed package.
 
 **The flow:**
 1. Caller specifies `(skill, difficulty, target_dimensions={"inference_depth": "multi_premise_inference"}, recent_topic_tags=["etias","gdpr"])`.
@@ -136,7 +138,11 @@ create index idx_pattern_user_skill on pattern_analyses(user_id, skill_id, gener
 5. On validation failure → one retry with stricter prompt → if still bad, return None + log `events.generation_failed`.
 6. Cost guard: per-user daily generation counter (default 50/day; configurable via env var `COMPASS_DAILY_GEN_CAP`). Hitting cap → return None + log `events.generation_capped`.
 
-**The big risk:** EPSO verbal items are subtle. Haiku 4.5 will produce 80% good, 15% awkward, 5% wrong. The mitigation is the few-shot examples — they ARE the prompt. **Stefano calibration session before this commit ships:** he gives 5-10 real EPSO verbal items + correct answers; Giovanni and Stefano tag them with the dimensions; those become the verbal prompt's anchors.
+**The big risk:** EPSO verbal items are subtle. Haiku 4.5 will produce 80% good, 15% awkward, 5% wrong. The mitigation is the few-shot examples — they ARE the prompt.
+
+**Update 2026-06-22 — anchors are already in the repo.** `backend/compass/few_shot/verbal_epso_anchors.json` carries 10 real EPSO AST verbal-reasoning items (passage + 4 options + correct index + source URL) extracted from EPSO's public sample tests. Commit 2 wires 3-5 of these into the generation prompt and we're done — no Stefano-authoring session needed for verbal. Stefano's review can shift to *spot-checking generated output quality* (~1 hour after first 30 generated items) rather than authoring anchors from scratch.
+
+For **numerical** and **abstract**: the same benchmark folder has them but they're image-dependent (numerical: chart in image; abstract: pattern series IS the image). Text-only generation doesn't apply. Numerical/abstract generators are post-v1 once we add either image generation or text-table item authoring.
 
 **Acceptance:**
 - `python -m scripts.test_generate verbal 2 --dims '{"inference_depth":"multi_premise_inference"}'` prints a valid item that an EPSO-aware reader would not flag as wrong
@@ -341,7 +347,7 @@ If the schedule slips, the M1/M2/M3 phasing means we can ship M1+M2 as "Compass 
 
 **Three open product decisions before commit 1:**
 
-1. **Few-shot anchors for the verbal generator.** Does Stefano have 5-10 clean real EPSO verbal items + correct answers? If yes → 30 min to tag and add to prompt. If no → 1-hour call to author them together. *Decision needed: this week.*
+1. ~~**Few-shot anchors for the verbal generator.**~~ ✅ Resolved 2026-06-22: 10 real EPSO AST verbal items extracted from the `epso_benchmark_data` download into `backend/ai/few_shot/verbal_epso_anchors.json`. Commit 2 wires them in directly.
 2. **Daily generation cap default.** 50 items/user/day proposed. *Decision needed: before commit 2.*
 3. **Practice vs. Calibration on `/me`.** Equal billing or Calibration as headline? Proposal: equal. *Decision needed: before commit 4.*
 

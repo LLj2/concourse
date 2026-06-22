@@ -1,0 +1,143 @@
+{
+  "_meta": {
+    "purpose": "Few-shot anchors for the Compass verbal-reasoning item generator.",
+    "source": "EPSO official sample tests, AST verbal reasoning (English).",
+    "source_url_pattern": "https://eu-careers.europa.eu/node/{category_id}",
+    "downloaded": "2026-06-22",
+    "item_count": 10,
+    "license_note": "EPSO sample tests are publicly available official preparation material. Items are reproduced verbatim for prompt engineering. Not redistributed as a question bank.",
+    "image_note": "Source items had a decorative image which is not needed for the question — the passage is self-contained text."
+  },
+  "items": [
+    {
+      "source": "EPSO sample test, AST verbal reasoning EN",
+      "source_url": "https://eu-careers.europa.eu/node/15357",
+      "content_id": "62",
+      "passage_and_question": "Of all forms of transport, air travel has seen by far the most impressive growth in the European Union over the last twenty years. Whilst the terrorist attacks of September 11th plunged the market into disarray, this disarray was short-lived and air traffic volumes have almost fully recovered. However, the boom in air travel is generating problems relating to overloaded air traffic control systems and overcrowding at airports. Each year Europe's airports come closer to the limits of their capacity, and airspace becomes more and more crowded, leading to delays and inefficiency. Saturated airports also limit access for new companies wishing to compete with well-established carriers. Which of the following statements is correct?",
+      "options": [
+        "A. The size of airports has grown spectacularly over the last two decades.",
+        "B. Air traffic control is finding it difficult to cope with the growth in air traffic.",
+        "C. New companies cannot enter the airline market as airports have no space for them.",
+        "D. Airspace overcrowding is more of an issue than airport overcrowding."
+      ],
+      "correct_index": 1
+    },
+    {
+      "source": "EPSO sample test, AST verbal reasoning EN",
+      "source_url": "https://eu-careers.europa.eu/node/15357",
+      "content_id": "63",
+      "passage_and_question": "Described by Aristotle as consisting of logos (the logical content of a speech) and lexis (the style of delivery of a speech), the study of rhetoric is the study of the art of persuasion. Despite a long and vigorous history, today rhetoric is rarely taught as a specific skill, a demise erroneously attributed by many to the fact that rhetorical theory and practice has not evolved fundamentally since antiquity. Yet the reality is that nowadays there is simply less need for powerful and convincing public speakers - modern media recording and broadcasting technology can support even the most unpolished presenter. Thus whilst the fundamentals of rhetoric may still be as apt as they ever were, other developments have rendered it obsolete. Which of the following statements is correct?",
+      "options": [
+        "A. The skills of rhetoric are no longer as effective on their audiences.",
+        "B. Rhetorical theory and practice are continually being revised.",
+        "C. Rhetoric may be seen as the study of what is said in a speech and how it is said.",
+        "D. Modern media technology is no substitute for formal training in rhetoric."
+      ],
+      "correct_index": 2
+    },
+    {
+      "source": "EPSO sample test, AST verbal reasoning EN",
+      "source_url": "https://eu-careers.europa.eu/node/15357",
+      "content_id": "64",
+      "passage_and_question": "The Schipperke is a breed of dog that originated in Flanders and was traditionally used as a guard on barges. The Schipperke (\"little captain\") is descended from the Leuvenaar, which also gave rise to the Belgian sheepdog. A short, thickset, tailless dog with a dense black coat and a fox-like head, the Schipperke stands approximately 32 cm high and weighs up to 8 kg. It has a lively, inquisitive expression and is generally hardy and energetic, a capable hunter of rats and other small vermin, and a good watchdog. Which of the following statements is correct?",
+      "options": [
+        "A. The Schipperke is related to the fox.",
+        "B. The Schipperke is an excellent swimmer.",
+        "C. The Belgian Sheepdog is quite a short dog.",
+        "D. A black dog with a tail could not be a Schipperke."
+      ],
+      "correct_index": 3
+    },
+    {
+      "source": "EPSO sample test, AST verbal reasoning EN",
+      "source_url": "https://eu-careers.europa.eu/node/15357",
+      "content_id": "65",
+      "passage_and_question": "Fears over the security of Internet-based telephone calls have been fuelled by the case of a man said to have made more than €700 000 by illegally gaining access to the computer systems of Internet telephone companies and fraudulently selling calls over their networks. This case is the first prosecution for alleged Internet call crime. Experts believe that it could prove a significant setback for the fast-growing European Internet calls industry. Internet telephone call services have revolutionised communications, allowing users to make free calls to anywhere in the world, provided they have a modern Internet connection and a computer with the right software. Companies offering the services pay the telephone companies to link Internet calls with the traditional telephone network. Which of the following statements is correct?",
+      "options": [
+        "A. Prior to the prosecution of this man, fears regarding the security of Internet-based telephone calls were low.",
+        "B. Internet call companies in Europe fear that this case will slow down their fast growing industry.",
+        "C. Users of Internet telephone services do not have to pay for the computer equipment or software required to access these services.",
+        "D. Telephone companies obtain revenue from the companies that offer Internet call services."
+      ],
+      "correct_index": 3
+    },
+    {
+      "source": "EPSO sample test, AST verbal reasoning EN",
+      "source_url": "https://eu-careers.europa.eu/node/15357",
+      "content_id": "66",
+      "passage_and_question": "The pagan roots of Easter can be found in the celebration of the spring equinox, a date that has been treated as an important holiday by many different religions and for many millennia. Occurring every year on March 20th, 21st, or 22nd, the spring equinox marks the end of winter and the beginning of spring. For cultures in northern climates, this date marks the renewed life of the Earth that comes with spring and is also strongly associated with fertility and reproduction. Which of the following statements is correct?",
+      "options": [
+        "A. Easter is primarily a pagan festival.",
+        "B. Easter occurs around March 21st every year.",
+        "C. In southern climates there is no celebration of the spring equinox.",
+        "D. The celebration of the spring equinox has a long history."
+      ],
+      "correct_index": 3
+    },
+    {
+      "source": "EPSO sample test, AST verbal reasoning EN",
+      "source_url": "https://eu-careers.europa.eu/node/15357",
+      "content_id": "67",
+      "passage_and_question": "Invasive species are living organisms that have been transported beyond their original native habitat to flourish in new environments, for example zebra mussels in the US, or rabbits in Australia. The enormous growth in the international mobility of people and commodities in the last fifty years means that invasive species now cause unprecedented environmental damage. This is because the predators that evolved with them and that control their population in their native habitats are generally not present in their new environment. In turn native species may be unable to compete successfully for vital resources and may therefore be driven to extinction. Indeed, invasive species are now the second most important cause of biodiversity loss, after habitat destruction. Which of the following statements is correct?",
+      "options": [
+        "A. The biodiversity loss caused by invasive species is now greater than ever before.",
+        "B. The zebra mussel has no predators in the US.",
+        "C. Invasive species have only become a problem in the last fifty years.",
+        "D. Native species are driven to extinction because they require different resources from invasive ones."
+      ],
+      "correct_index": 0
+    },
+    {
+      "source": "EPSO sample test, AST verbal reasoning EN",
+      "source_url": "https://eu-careers.europa.eu/node/15357",
+      "content_id": "68",
+      "passage_and_question": "Preheating the oven and accurately measuring and combining your ingredients are the key factors in making a perfect cake. First, preheat the oven and then beat the sugar and butter together until fully blended. Next add the batter, consisting of whole milk, eggs and vanilla extract. Skimmed milk can be used instead of whole milk if preferred; however more butter must then be used during the first stage. Finally, once the batter has been blended into the mixture, mix in the flour and a teaspoon of baking powder. Baking powder is necessary for the cake to rise, although how much it rises is determined by the quality of the mixing process, the relative quantities of ingredients and the oven temperature. Which of the following statements is correct?",
+      "options": [
+        "A. There are three factors which determine how much a cake rises.",
+        "B. The more baking powder is added to the mixture, the more the cake will rise.",
+        "C. Butter is normally added twice under the recipe: once at the initial stage when it is beaten in with the sugar and then to make the batter.",
+        "D. The batter used to make cake must be made with whole milk, eggs and vanilla extract."
+      ],
+      "correct_index": 0
+    },
+    {
+      "source": "EPSO sample test, AST verbal reasoning EN",
+      "source_url": "https://eu-careers.europa.eu/node/15357",
+      "content_id": "69",
+      "passage_and_question": "DNA tests have confirmed that a white bear with brown patches that was shot dead in northern Canada is the first grizzly-polar hybrid found in the wild. Until now, grizzly-polar hybrid bears have been found only in zoos, because they rarely even meet, let alone mate, in the wild. There are also differences such as the timing of mating seasons, which not only make such hybrids highly unusual but also limit the survival chances of any resultant offspring. Indeed, it is likely that the only chance of such a union occurring is when, after emerging from hibernation, a disoriented grizzly bear ventures across the ice into polar bear territory. Which of the following statements is correct?",
+      "options": [
+        "A. The main reason why grizzly and polar bears do not crossbreed is that they have different mating seasons.",
+        "B. Grizzly and polar bears do breed naturally in zoos.",
+        "C. The two breeds would most likely encounter each other when a polar bear accidentally ventures into grizzly bear territory.",
+        "D. There are a number of different factors which limit the likelihood of a grizzly-polar hybrid occurring in the wild."
+      ],
+      "correct_index": 3
+    },
+    {
+      "source": "EPSO sample test, AST verbal reasoning EN",
+      "source_url": "https://eu-careers.europa.eu/node/15357",
+      "content_id": "70",
+      "passage_and_question": "In 1815 a volcanic eruption, the largest ever recorded, smothered villages on the small island of Sumbawa in Indonesia and claimed the lives of an estimated one hundred thousand people. Such was the impact of the eruption that 1cm of ash fell on locations up to 500km away. The eruption had far reaching effects; crop damage was reported in parts of France and Germany. The amount of material ejected by the volcano into the atmosphere caused a global drop in temperature of nearly one degree Centigrade. Over ninety thousand people died in the weeks following the eruption from starvation and disease, with only a minority of deaths occurring on the day of the eruption. Which of the following statements is correct?",
+      "options": [
+        "A. There are other volcanic eruptions on record that have been as destructive.",
+        "B. The majority of the death toll occurred in the time following the eruption.",
+        "C. The environmental effects of the eruption were confined to Sumbawa and islands located nearby.",
+        "D. The crop damage in Western Europe was due to falling ash."
+      ],
+      "correct_index": 1
+    },
+    {
+      "source": "EPSO sample test, AST verbal reasoning EN",
+      "source_url": "https://eu-careers.europa.eu/node/15357",
+      "content_id": "71",
+      "passage_and_question": "As the number of air passengers has increased, so has the political pressure to act to curb greenhouse gas emissions. A team of researchers from Britain and the US has come up with a revolutionary new jet aircraft design that could make a dramatic contribution to curbing climate change. The design is radically different from other aircraft, with a wedge-shaped body, no tail and small wings. Crucially, it could be 35 % more fuel-efficient than any airliner currently in use, but this does not necessarily mean that it will be built. Ever since the jet age began in 1957, commercial aircraft have changed very little in their basic appearance. Which of the following statements is correct?",
+      "options": [
+        "A. The new aircraft is the most fuel-efficient airliner ever built",
+        "B. The number of people travelling by air each year is expected to increase steadily",
+        "C. The new aircraft will use less fuel than existing commercial jets because it has no tail",
+        "D. The fuel economy afforded by the new design does not guarantee its eventual construction"
+      ],
+      "correct_index": 3
+    }
+  ]
+}
