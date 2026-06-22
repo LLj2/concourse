@@ -1,9 +1,9 @@
 # Concourse — Roadmap
 
 > **Shared, trackable plan.** Tick boxes as work lands. Keep this file honest — it is the single source of truth for "what's done / what's next."
-> **Last updated:** 2026-06-20
+> **Last updated:** 2026-06-22
 > **Target launch:** first half of September 2026 (~12 weeks from the 2026-06-18 plan).
-> **Sources:** `CONTEXT.md`, `EPSO-Planner-MVP-Build-Plan.md`, `HANDOFF.md`. This roadmap does not invent scope beyond those.
+> **Sources:** `CONTEXT.md`, `EPSO-Planner-MVP-Build-Plan.md`, `HANDOFF.md`, `OVERVIEW.md`, `COGNITIVE_DIMENSIONS.md`, `COMPASS_ROADMAP.md`. This roadmap does not invent scope beyond those.
 
 ---
 
@@ -47,10 +47,11 @@ The architectural keystone (fixes Risks 1, 3, 5 at once): **the product measures
 | Session 4 | Scoring + profile + first JSON-schema-validated LLM call | ✅ Done (2026-06-20) |
 | Sessions 6–7 | Plan generation (master + daily rule engine) | ✅ Done (2026-06-20) |
 | Session 8 | Logging layer C (adherence) + event-driven replan | ✅ Done (2026-06-20) |
-| Diagnostic breadth | Numerical/abstract/EU item banks | ⛔ Blocked — source-vs-author decision (#5) |
-| Session 9 | Stripe trial + paywall + funnel instrumentation | ⛔ Blocked — Stripe account/owner (#4) |
-| Layer B | Screenshot/paste → LLM parse | ⬜ Deferred ("only if time allows") |
-| Pilot | Closed pilot (10–30 users), watch week-3 retention | ⬜ Not started |
+| **Compass — flagship feature** | **Adaptive practice engine: dimension-tagged items, pattern detection, self-correcting schema** | 🟡 **In flight (started 2026-06-22)** — see §4.5 below |
+| Diagnostic breadth | Numerical/abstract/EU item banks | 🟡 Replaced by Compass — generation pipeline produces them on demand |
+| Session 9 | Stripe trial + paywall + funnel instrumentation | ⛔ Blocked — Stripe account/owner (#4); deferred until Compass v1 ships |
+| Layer B | Screenshot/paste → LLM parse | ❌ Dropped — Compass platform-native testing is the moat instead |
+| Pilot | Closed pilot (10–30 users) on Compass, watch week-3 retention | ⬜ Not started — gated on Compass v1 |
 | Launch | Public launch for AD5/AD7 wave, turn on paid channels | ⬜ Not started |
 
 ---
@@ -81,6 +82,61 @@ The architectural keystone (fixes Risks 1, 3, 5 at once): **the product measures
 
 ---
 
+## 4.5. Compass — flagship feature rollout 🟡 IN FLIGHT
+
+**Compass is the adaptive practice engine that turns Concourse from a planner into the place EPSO candidates train every day.** It is the strategic moat: every question carries cognitive-dimension metadata; every wrong answer carries a misconception tag; an LLM pass finds patterns no individual question could reveal; the next session is generated to target the user's specific weak patterns; the dimension schema itself self-corrects with real data.
+
+See `COMPASS_ROADMAP.md` for the full 6-commit build plan (phasing, risks, calendar). Sub-list here mirrors that file's milestones — tick boxes as commits land.
+
+**Why this matters strategically.** Other prep platforms know *whether* you got a question right. Compass knows *why*, *what pattern* the wrongness fits, and *what to give you next*. After 50-100 users practice for a few weeks, we own per-user cognitive fingerprints no one else has — and the validation pipeline (commit 6) tells us which dimensions are actually predictive so we improve the schema with data, not opinion.
+
+### Cognitive-dimensions schema ✅
+- [x] **Schema v1 designed** — 46 dimensions across numerical / verbal / abstract / FRMCQ / written, plus 17 distractor classes + 3 meta dimensions. Merged from two independent AI deep-research runs (Claude Research + ChatGPT Deep Research), 2026-06-22.
+- [x] **Stefano sign-off** on the High/Medium/Low priority assessment (2026-06-22).
+- [x] **Word-doc review document** generated and shared (`Concourse-Cognitive-Dimensions-for-Stefano_2026-06-22.docx`).
+- [x] **Documented** in `COGNITIVE_DIMENSIONS.md` (full schema) + `OVERVIEW.md` (the channel-onboarding doc) + `COMPASS_ROADMAP.md` (the engineering plan).
+
+### Milestone M1 — Foundation (commits 1–2, ~2.5 sessions)
+- [ ] **Commit 1** — Schema migration 003: `items.dimensions` JSONB, `items.option_diagnostics` JSONB, new `practice_sessions`, `dimension_mastery`, `pattern_analyses` tables.
+- [ ] **Commit 2** — Item generation pipeline: `backend/ai/generate_item.py` with target-dimension dict + JSON-schema-validated output; ~45 min Stefano-calibration session on the verbal generator prompt; cost guard (`COMPASS_DAILY_GEN_CAP` env, default 50/user/day).
+
+### Milestone M2 — Practice loop live (commits 3–4, ~2 sessions)
+- [ ] **Commit 3** — Bank-first practice picker + sessions API: 60% focus / 30% weak / 10% control distribution; reads `pattern_analyses.focus_dimensions`; generates only when bank is dry. `POST /api/practice/start|answer|end`.
+- [ ] **Commit 4** — Practice UI + insight panel: `/practice` page (skill+length picker, immediate feedback, dimensional end-screen); `/me` "What we have learned about you" panel renders `pattern_analyses.insight_md`; daily plan items deep-link into targeted practice.
+
+### Milestone M3 — The moat (commits 5–6, ~2 sessions)
+- [ ] **Commit 5** — Pattern-analysis worker: LLM reads `dimension_mastery` matrix, writes 1-3 plain-English patterns + focus dimensions per user×skill. Triggered on session end (≥20 responses since last analysis). Extends Leonardo's `replan_signal()` to fire on `pattern_updated`.
+- [ ] **Commit 6** — Validation pipeline: `/admin/dimensions/health` shows discrimination check (top-quartile vs bottom-quartile accuracy per dimension), predictivity check (mastery at T vs score at T+N), emergent-pattern detection (monthly LLM pass surfacing clusters that don't map to v1 dimensions). This makes the schema self-correcting.
+
+### Open decisions before commit 1 (settle this week)
+- [ ] **Few-shot EPSO items** for the verbal generator — does Stefano have 5-10 real items + correct answers, or do we author them in a 30-min call?
+- [ ] **Daily generation cap default** — 50 items/user/day proposed; confirm or override.
+- [ ] **Practice vs. Calibration positioning on `/me`** — equal billing (recommended) vs Calibration headline.
+
+### Infra dependencies (Leonardo's track)
+- [ ] **Custom SMTP** (Resend) — not blocking Compass build, but needed before pilot in week 4 for reliable magic-link delivery.
+- [ ] **Dev/staging Supabase split** (issue #3) — coordinate timing before running migration 003 on the shared DB.
+
+### Calendar target (~4 weeks)
+- **Week 1** (2026-06-22 → 2026-06-28): Commit 1 ships; Commit 2 prompt-tuning with Stefano starts.
+- **Week 2**: Commit 2 ships; Commit 3 ships; Commit 4 starts. **End of week 2 = Compass v0.5 (M1+M2 done, practice loop live, no insight layer).**
+- **Week 3**: Commit 4 ships; Commit 5 ships. Insight panel renders for real users.
+- **Week 4** (target 2026-07-20): Commit 6 ships. **Compass v1 live.**
+- **Weeks 5-6**: 10-30 pilot users on Compass, weekly review of `/admin/dimensions/health`.
+- **Week 7**: Stefano review on real data → schema v2 plan.
+
+If any week slips: M1+M2 alone (Compass v0.5) is independently sellable. The moat (M3) is the upside, not the floor.
+
+### Cost framing (2026-06-22)
+- **Dev runs on Haiku 4.5** (`$1.00/$5.00 per MTok`, 5× cheaper than Opus 4.8). Set `ANTHROPIC_MODEL=claude-haiku-4-5` in dev `.env`.
+- **Production starts on Haiku too** — escalate to Sonnet 4.6 (`$3/$15`) only if item-generation quality is unacceptable; reserve Opus 4.8 for tasks that genuinely need it.
+- **Bank-first picker** (commit 3) amortizes generation cost as the bank grows — after ~50 users, 90%+ of items are bank-served, free.
+- **Per-user daily generation cap** (commit 2, env-configurable) prevents runaway loops.
+- **Pattern-analysis caching** (commit 5) uses `cache_control: {type: "ephemeral"}` — cached prompt reads cost ~10% of base rate.
+- **Anthropic billing alert** set at $20/month at console.anthropic.com to catch surprises early.
+
+---
+
 ## 5. Next — remaining MVP build
 
 Sequencing follows `EPSO-Planner-MVP-Build-Plan.md §6`. The credibility-critical pieces (diagnostics → scoring → plan generation) are front-loaded; polish is deferred.
@@ -92,13 +148,11 @@ Sequencing follows `EPSO-Planner-MVP-Build-Plan.md §6`. The credibility-critica
 - [~] CV-fit strategy modifier — deferred: no CV upload exists yet. The LLM narrative covers the go/no-go read; CV-fit lands when CV upload is built.
 - [x] Profile visualization (`/profile`, linked from `/me`).
 
-### Diagnostic breadth (build plan §4.2 — beyond verbal v0)  ⛔ blocked
-The adaptive engine already handles any `skill_id`; it just needs calibrated item banks.
-- [ ] Numerical reasoning items.
-- [ ] Abstract reasoning items.
-- [ ] Short EU-knowledge quiz.
-- [ ] Reach ~15–25 calibrated items **per reasoning skill** (8 verbal shipped is enough to demo, not to run).
-- [ ] **Decision: source vs. author items** → **issue #5**. The credibility bottleneck.
+### Diagnostic breadth (build plan §4.2 — beyond verbal v0)  🟡 Replaced by Compass
+**The "source vs. author items" decision is no longer blocking** — Compass's generation pipeline (§4.5, commit 2) produces dimension-tagged items on demand. The 8 verbal seed items stay; numerical / abstract / EU-knowledge banks grow organically as users practice. Stefano-authored few-shot anchors per skill keep generation quality high.
+
+- [x] Decision resolved: in-platform generation instead of bulk authoring/sourcing.
+- [ ] Numerical / abstract / EU-knowledge prompts tuned with Stefano few-shot anchors (part of Compass commit 2).
 
 ### Sessions 6–7 — Plan generation  ✅ DONE (2026-06-20)
 - [x] Master plan: rule engine over score gaps × soft dims × time-to-exam tilt × weekly hours → per-area weekly minutes (`backend/logic/planning.py`, sums exactly to budget).
@@ -119,8 +173,10 @@ The adaptive engine already handles any `skill_id`; it just needs calibrated ite
 - [ ] Per-channel funnel instrumentation: UTM → signup → trial-start → paid (PostHog).
 
 ### Weeks 10–11 — Closed pilot
+**Gated on Compass v1 (§4.5 M3) shipping. Pilot users practice on Compass, not on a generic prep tool.**
 - [ ] Recruit 10–30 users.
 - [ ] Watch **week-3 retention**; fix the single biggest drop-off.
+- [ ] Weekly review of `/admin/dimensions/health` to validate the cognitive-dimensions schema with real data.
 
 ### Week 12 — Public launch
 - [ ] Launch for the AD5/AD7 wave.
@@ -143,10 +199,12 @@ Tracked so they don't get lost behind feature work:
 
 ## 7. Open decisions (recap from CONTEXT.md / HANDOFF.md)
 
-- [ ] **Source vs. author diagnostic items** — the credibility bottleneck. Stefano flagged EUTraining-style realism is hard to match; frame the in-product check as a *measurement instrument*, not a practice tool.
+- [x] **Source vs. author diagnostic items** — resolved 2026-06-22: in-platform generation via Compass (§4.5).
+- [x] **LLM model tier for dev** — resolved 2026-06-22: Haiku 4.5 in dev; production starts on Haiku and escalates only if quality demands it.
+- [ ] **Few-shot EPSO items** for the verbal generator (Stefano) — needed before Compass commit 2.
 - [ ] **First acquisition channels** to instrument (EPSO communities, LinkedIn, coach partnerships) + the paid-test budget.
-- [ ] **Stripe account owner** (revenue flows there) — not yet created.
-- [ ] **Product name** — "Concourse" is the working name (renameable).
+- [ ] **Stripe account owner** (revenue flows there) — not yet created; deferred until Compass v1 ships.
+- [ ] **Product name** — "Concourse" is the working name; "Compass" is the flagship feature name (decided 2026-06-22).
 
 ### Parked (post-MVP, from review comments)
 - Pause-at-€5 subscription for users between concorsi → **v1.1**, after launch.
