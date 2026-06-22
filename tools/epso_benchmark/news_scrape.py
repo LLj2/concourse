@@ -19,7 +19,9 @@ gap is explicit and never silently scraped:
 
     epso       eu-careers.europa.eu/en/news      ENABLED  (Drupal, no AI restriction)
     orseu      orseu-concours.com/fr/blog        ENABLED  (PrestaShop blog, no AI restriction)
-    europapp   europapp.eu (blog sitemaps)       ENABLED  (sitemap-driven, no AI restriction)
+    europapp   europapp.eu (blog sitemaps)       DISABLED (client-side-rendered SPA; no
+                                                            text in static HTML — needs a
+                                                            headless browser or their API)
     eutraining eutraining.eu                      DISABLED (robots.txt disallows AI bots
                                                             incl. ClaudeBot + Content-Signal
                                                             ai-train=no; Cloudflare 403 to
@@ -78,6 +80,13 @@ RE_PUB_TIME = re.compile(
     r'<meta[^>]+property=["\']article:published_time["\'][^>]+content=(["\'])(.*?)\1',
     re.I)
 RE_TIME_TAG = re.compile(r'<time[^>]+datetime=(["\'])(.*?)\1', re.I)
+# EPSO (Drupal) renders the publish date as plain text in a node-post-date field,
+# with no <time>/meta — grab the DD/MM/YYYY that follows the field marker.
+RE_DRUPAL_DATE = re.compile(r"node-post-date.*?(\d{1,2}/\d{1,2}/20\d{2})", re.S)
+# ORSEU (PrestaShop blog) uses schema.org itemprop="datePublished" with the date
+# as text ("Publié : 29/05/2026"), no datetime attr. Anchor on it so we take the
+# article's own date, not the related-articles sidebar dates further down.
+RE_DATEPUBLISHED = re.compile(r"datePublished.*?(\d{1,2}/\d{1,2}/20\d{2})", re.S)
 RE_DESC = re.compile(
     r'<meta[^>]+(?:name|property)=["\'](?:og:)?description["\'][^>]+content=(["\'])(.*?)\1',
     re.I | re.S)
@@ -113,6 +122,29 @@ def _first(*candidates: str | None) -> str:
     return ""
 
 
+def normalize_date(s: str) -> str:
+    """Return YYYY-MM-DD when recognisable (ISO 8601 prefix or DD/MM/YYYY),
+    else the input unchanged."""
+    s = s.strip()
+    m = re.match(r"(20\d{2})-(\d{2})-(\d{2})", s)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    m = re.match(r"(\d{1,2})/(\d{1,2})/(20\d{2})", s)
+    if m:
+        return f"{m.group(3)}-{int(m.group(2)):02d}-{int(m.group(1)):02d}"
+    return s
+
+
+def strip_site_suffix(title: str) -> str:
+    """Drop a trailing ' | Site Name' that CMSes append to <title> (e.g.
+    'AD5 Graduates ... | EU Careers')."""
+    if " | " in title:
+        head, tail = title.rsplit(" | ", 1)
+        if head and len(tail) <= 30:
+            return head.strip()
+    return title
+
+
 def extract_body(page_html: str) -> str:
     """Best-effort main-text extraction without a DOM parser.
 
@@ -139,6 +171,12 @@ def parse_article(url: str, page_html: str) -> dict:
             date = g.strip()
             break
     if not date:
+        for rx in (RE_DATEPUBLISHED, RE_DRUPAL_DATE):
+            m = rx.search(page_html)
+            if m:
+                date = m.group(1)
+                break
+    if not date:
         m = RE_DATE_IN_URL.search(url)
         if m:
             date = f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
@@ -146,8 +184,8 @@ def parse_article(url: str, page_html: str) -> dict:
     body = extract_body(page_html)
     return {
         "url": url,
-        "title": title,
-        "date": date,
+        "title": strip_site_suffix(title),
+        "date": normalize_date(date),
         "lang": (lang_m.group(1).split("-")[0].lower() if lang_m else ""),
         "summary": _clean(_grp(RE_DESC.search(page_html))),
         "text": body,
@@ -273,15 +311,10 @@ SOURCES: dict[str, Source] = {
     "orseu": ListingSource(
         "orseu",
         "https://www.orseu-concours.com/fr/blog",
-        # PrestaShop blog article links carry a numeric id; exclude category/module
-        article_re=r"orseu-concours\.com/fr/[^?]*\d+-[a-z0-9-]+",
-    ),
-    "europapp": SitemapSource(
-        "europapp",
-        sitemaps=[
-            "https://europapp.eu/sitemap-blog-en.xml",
-            "https://europapp.eu/sitemap-blog-es.xml",
-        ],
+        # Real blog posts end in -n<id> (/fr/blog/<slug>-n61); category listings
+        # end in -c<id> (concours-epso-c3) and the bare /fr/blog is pagination —
+        # both excluded so we keep articles, not listing/category chrome.
+        article_re=r"orseu-concours\.com/fr/blog/[a-z0-9-]+-n\d+",
     ),
 }
 
@@ -292,15 +325,21 @@ DISABLED = {
                   "Content-Signal: ai-train=no; Cloudflare returns 403 to non-browser "
                   "UAs. Scraping would require ignoring robots.txt and spoofing a browser "
                   "UA. Pending a separate decision (asked an EU-careers contact for advice).",
+    "europapp": "client-side-rendered SPA (Vite/React; <div id=\"root\">). Article "
+                "text is not in the static HTML and there's no public JSON feed in the "
+                "shell, so the polite static fetch yields an empty body. Would need a "
+                "headless browser or their API — deferred.",
 }
 
 
 def raw_key(url: str) -> str:
-    """Stable, filesystem-safe filename for an article's raw HTML cache."""
-    path = urlparse(url).path.strip("/")
-    m = re.search(r"(\d+)", path.split("/")[-1] or path)
-    stem = m.group(1) if m else re.sub(r"[^a-z0-9]+", "-", path.lower())[:80] or "index"
-    return stem
+    """Stable, collision-free, filesystem-safe filename for an article's raw
+    HTML cache. Uses a purely-numeric last path segment as-is (EPSO /…/20148),
+    otherwise slugifies the whole segment (ORSEU /fr/blog/<slug>-n61)."""
+    last = urlparse(url).path.strip("/").split("/")[-1] or "index"
+    if last.isdigit():
+        return last
+    return re.sub(r"[^a-z0-9]+", "-", last.lower()).strip("-")[:80] or "index"
 
 
 def scrape_source(src: Source, crawler: Crawler, robots: Robots,
