@@ -23,5 +23,13 @@ class Settings(BaseModel):
     posthog_public_key: str = os.getenv("POSTHOG_PUBLIC_KEY", "")
     posthog_host: str = os.getenv("POSTHOG_HOST", "https://eu.posthog.com")
 
+    # --- Compass (the adaptive practice engine) ---
+    # Org-global cap on LLM item generations per UTC day. Set per-user later in commit 4
+    # when real users exist; during dev this is a single shared bucket.
+    compass_daily_gen_cap: int = int(os.getenv("COMPASS_DAILY_GEN_CAP", "200"))
+    # When false (the default), generated items land with archived=true so they're invisible
+    # to the picker until a human flips them. Flip to true once first ~30 items audit clean.
+    compass_autoapprove_generated: bool = os.getenv("COMPASS_AUTOAPPROVE_GENERATED", "false").lower() == "true"
+
 
 settings = Settings()
