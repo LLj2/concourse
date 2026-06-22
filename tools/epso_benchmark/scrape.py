@@ -117,14 +117,15 @@ class Crawler:
         )
         self.last_request = 0.0
 
-    def get(self, url: str, *, retries: int = 6) -> httpx.Response | None:
+    def get(self, url: str, *, retries: int = 6,
+            headers: dict | None = None) -> httpx.Response | None:
         # politeness: never hammer; honour a fixed inter-request delay
         wait = self.delay - (time.monotonic() - self.last_request)
         if wait > 0:
             time.sleep(wait)
         for attempt in range(retries):
             try:
-                r = self.client.get(url)
+                r = self.client.get(url, headers=headers)
             except httpx.HTTPError as e:
                 print(f"    ! {url} -> {e!r} (attempt {attempt+1})", file=sys.stderr)
                 time.sleep(2 ** attempt)

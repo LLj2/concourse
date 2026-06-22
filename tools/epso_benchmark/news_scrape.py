@@ -19,9 +19,10 @@ gap is explicit and never silently scraped:
 
     epso       eu-careers.europa.eu/en/news      ENABLED  (Drupal, no AI restriction)
     orseu      orseu-concours.com/fr/blog        ENABLED  (PrestaShop blog, no AI restriction)
-    europapp   europapp.eu (blog sitemaps)       DISABLED (client-side-rendered SPA; no
-                                                            text in static HTML — needs a
-                                                            headless browser or their API)
+    europapp   europapp.eu (Supabase REST API)   ENABLED  (SPA; read its public Supabase
+                                                            blog_posts table via the site's
+                                                            own publishable key, like the
+                                                            browser does — no HTML scraping)
     eutraining eutraining.eu                      DISABLED (robots.txt disallows AI bots
                                                             incl. ClaudeBot + Content-Signal
                                                             ai-train=no; Cloudflare 403 to
@@ -158,6 +159,33 @@ def extract_body(page_html: str) -> str:
     return clean_text(block)
 
 
+# Block-editor types that are navigation/marketing chrome, not article prose.
+SKIP_BLOCKS = {"cta_box", "toc", "image", "divider", "banner"}
+
+
+def render_blocks(blocks: list | None) -> str:
+    """Flatten a block-editor `content_blocks` array (EuropApp/Supabase) into
+    plain text: paragraphs (html), headings (text) and FAQ Q/A, skipping CTA /
+    table-of-contents / media chrome."""
+    parts: list[str] = []
+    for b in blocks or []:
+        if not isinstance(b, dict):
+            continue
+        t = b.get("type")
+        if t in SKIP_BLOCKS:
+            continue
+        if t == "faq":
+            for it in b.get("items", []) or []:
+                if isinstance(it, dict):
+                    parts += [str(it.get("question", "")), str(it.get("answer", ""))]
+        else:
+            for k in ("text", "html", "title"):
+                if b.get(k):
+                    parts.append(str(b[k]))
+                    break
+    return _clean(" ".join(p for p in parts if p))
+
+
 def parse_article(url: str, page_html: str) -> dict:
     title = _first(
         _grp(RE_OG_TITLE.search(page_html)),
@@ -228,13 +256,52 @@ class Robots:
 
 # --- sources -----------------------------------------------------------------
 class Source:
-    """A scrape target. Subclasses implement discover()."""
+    """A scrape target. URL-based sources implement discover() and reuse the
+    default records() loop (fetch each page → parse_article). API-based sources
+    (e.g. SupabaseSource) override records() and skip discover()."""
     key: str = ""
-    enabled: bool = True
-    note: str = ""
 
     def discover(self, crawler: Crawler, robots: Robots, max_pages: int) -> list[str]:
         raise NotImplementedError
+
+    def records(self, crawler: Crawler, robots: Robots, max_pages: int,
+                max_articles: int, out_dir: Path) -> list[dict]:
+        """Default: discover article URLs, then fetch + parse each (with a raw
+        HTML cache as audit trail). robots.txt is honoured per URL."""
+        urls = self.discover(crawler, robots, max_pages)
+        seen: set[str] = set()
+        urls = [u for u in urls if not (u in seen or seen.add(u))]
+        if max_articles and len(urls) > max_articles:
+            print(f"  (capping {len(urls)} discovered -> {max_articles}; "
+                  f"raise --max-articles for full coverage)")
+            urls = urls[:max_articles]
+        print(f"  {len(urls)} article URL(s) to fetch")
+
+        records: list[dict] = []
+        for url in urls:
+            if not robots.allowed(url):
+                print(f"  - robots disallows {url}", file=sys.stderr)
+                continue
+            cache = out_dir / f"{raw_key(url)}.html"
+            if cache.exists():
+                page = cache.read_text(encoding="utf-8", errors="replace")
+            else:
+                r = crawler.get(url)
+                if not r or r.status_code != 200:
+                    print(f"  ! {url} -> {r.status_code if r else 'ERR'}", file=sys.stderr)
+                    continue
+                page = r.text
+                cache.write_text(page, encoding="utf-8")
+            rec = parse_article(url, page)
+            rec["source"] = self.key
+            if not rec["title"] or rec["text_len"] < 80:
+                print(f"  ~ thin/unparsed, skipping: {url} (len={rec['text_len']})",
+                      file=sys.stderr)
+                continue
+            records.append(rec)
+            print(f"  + {rec['date'] or '????'} [{rec['lang'] or '??'}] "
+                  f"{rec['title'][:70]} ({rec['text_len']} chars)")
+        return records
 
 
 class SitemapSource(Source):
@@ -299,6 +366,63 @@ class ListingSource(Source):
         return found
 
 
+class SupabaseSource(Source):
+    """Reads posts directly from a site's public Supabase (PostgREST) backend,
+    using the same public 'publishable' key the site's own JavaScript ships to
+    every browser. We consume the already-published rows exactly as an anonymous
+    visitor does — no HTML scraping, no headless browser, no auth. Access is
+    whatever the project's Row-Level Security allows anonymously (i.e. published
+    public posts only). Raw JSON rows are cached as the audit trail."""
+    def __init__(self, key: str, api_base: str, api_key: str, table: str,
+                 site_url: str, select: str, where: str = "status=eq.published"):
+        self.key = key
+        self.api_base = api_base.rstrip("/")
+        self.api_key = api_key
+        self.table = table
+        self.site_url = site_url.rstrip("/")
+        self.select = select
+        self.where = where
+
+    def records(self, crawler, robots, max_pages, max_articles, out_dir):
+        url = (f"{self.api_base}/rest/v1/{self.table}"
+               f"?select={self.select}&{self.where}&order=published_at.desc")
+        if max_articles:
+            url += f"&limit={max_articles}"
+        hdrs = {"apikey": self.api_key, "Authorization": f"Bearer {self.api_key}"}
+        r = crawler.get(url, headers=hdrs)
+        if not r or r.status_code != 200:
+            print(f"  ! {self.key}: API -> {r.status_code if r else 'ERR'}", file=sys.stderr)
+            return []
+        rows = r.json()
+        print(f"  {len(rows)} row(s) from {self.table}")
+        records: list[dict] = []
+        for row in rows:
+            slug = row.get("slug", "")
+            lang = (row.get("language") or "").lower()
+            (out_dir / f"{raw_key(slug or row.get('id', 'row'))}.json").write_text(
+                json.dumps(row, ensure_ascii=False, indent=1), encoding="utf-8")
+            body = _clean(row.get("content_html")) or render_blocks(row.get("content_blocks"))
+            rec = {
+                "source": self.key,
+                "url": (f"{self.site_url}/{lang}/blog/{slug}" if lang
+                        else f"{self.site_url}/blog/{slug}"),
+                "title": _clean(row.get("title")),
+                "date": normalize_date((row.get("published_at") or "")[:10]),
+                "lang": lang,
+                "summary": _clean(row.get("excerpt")),
+                "text": body,
+                "text_len": len(body),
+            }
+            if not rec["title"] or rec["text_len"] < 80:
+                print(f"  ~ thin row, skipping: {slug} (len={rec['text_len']})",
+                      file=sys.stderr)
+                continue
+            records.append(rec)
+            print(f"  + {rec['date'] or '????'} [{lang or '??'}] "
+                  f"{rec['title'][:70]} ({rec['text_len']} chars)")
+        return records
+
+
 # Registry. Article-link regexes are intentionally permissive and may need a
 # tweak after the first live run — every discovered URL is validated by the
 # extractor (an article must yield a title + body), so over-capture is harmless.
@@ -316,6 +440,18 @@ SOURCES: dict[str, Source] = {
         # both excluded so we keep articles, not listing/category chrome.
         article_re=r"orseu-concours\.com/fr/blog/[a-z0-9-]+-n\d+",
     ),
+    # EuropApp is a Vite/React SPA whose blog lives in a public Supabase table;
+    # we read it via the site's own public publishable key (PostgREST), the same
+    # way the browser does — no headless rendering needed. Key/table/URL were
+    # lifted from the site's JS bundle.
+    "europapp": SupabaseSource(
+        "europapp",
+        api_base="https://wshuyjwtyqdbmqhwudqd.supabase.co",
+        api_key="sb_publishable_XL7aAUxE_nOPR5nYBa4kNg_fI1J4ldH",
+        table="blog_posts",
+        site_url="https://europapp.eu",
+        select="slug,language,status,published_at,title,excerpt,content_html,content_blocks",
+    ),
 }
 
 # Registered but deliberately OFF — documents the coverage gap (cf. tao_refs in
@@ -325,10 +461,6 @@ DISABLED = {
                   "Content-Signal: ai-train=no; Cloudflare returns 403 to non-browser "
                   "UAs. Scraping would require ignoring robots.txt and spoofing a browser "
                   "UA. Pending a separate decision (asked an EU-careers contact for advice).",
-    "europapp": "client-side-rendered SPA (Vite/React; <div id=\"root\">). Article "
-                "text is not in the static HTML and there's no public JSON feed in the "
-                "shell, so the polite static fetch yields an empty body. Would need a "
-                "headless browser or their API — deferred.",
 }
 
 
@@ -345,44 +477,9 @@ def raw_key(url: str) -> str:
 def scrape_source(src: Source, crawler: Crawler, robots: Robots,
                   max_pages: int, max_articles: int) -> list[dict]:
     print(f"\n== source: {src.key} ==")
-    urls = src.discover(crawler, robots, max_pages)
-    # de-dup preserving order
-    seen: set[str] = set()
-    urls = [u for u in urls if not (u in seen or seen.add(u))]
-    if max_articles:
-        if len(urls) > max_articles:
-            print(f"  (capping {len(urls)} discovered -> {max_articles}; "
-                  f"raise --max-articles for full coverage)")
-        urls = urls[:max_articles]
-    print(f"  {len(urls)} article URL(s) to fetch")
-
     out_dir = RAW_DIR / src.key
     out_dir.mkdir(parents=True, exist_ok=True)
-    records: list[dict] = []
-    for url in urls:
-        if not robots.allowed(url):
-            print(f"  - robots disallows {url}", file=sys.stderr)
-            continue
-        cache = out_dir / f"{raw_key(url)}.html"
-        if cache.exists():
-            page = cache.read_text(encoding="utf-8", errors="replace")
-        else:
-            r = crawler.get(url)
-            if not r or r.status_code != 200:
-                print(f"  ! {url} -> {r.status_code if r else 'ERR'}", file=sys.stderr)
-                continue
-            page = r.text
-            cache.write_text(page, encoding="utf-8")
-        rec = parse_article(url, page)
-        rec["source"] = src.key
-        if not rec["title"] or rec["text_len"] < 80:
-            print(f"  ~ thin/unparsed, skipping: {url} (len={rec['text_len']})",
-                  file=sys.stderr)
-            continue
-        records.append(rec)
-        print(f"  + {rec['date'] or '????'} [{rec['lang'] or '??'}] "
-              f"{rec['title'][:70]} ({rec['text_len']} chars)")
-    return records
+    return src.records(crawler, robots, max_pages, max_articles, out_dir)
 
 
 def write_summary(records: list[dict]) -> str:

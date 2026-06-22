@@ -70,7 +70,7 @@ venv/Scripts/python.exe tools/epso_benchmark/news_scrape.py --source orseu --max
 |---|---|---|
 | `epso` | `eu-careers.europa.eu/en/news` (notices + news) | enabled |
 | `orseu` | `orseu-concours.com/fr/blog` | enabled |
-| `europapp` | `europapp.eu` | **disabled** — client-side-rendered SPA (Vite/React); article text isn't in the static HTML and there's no public JSON feed, so a polite static fetch returns an empty body. Needs a headless browser or their API. |
+| `europapp` | `europapp.eu` (Supabase REST API) | enabled — SPA, but its blog is a public Supabase `blog_posts` table. We read it via the site's own publishable key (PostgREST), exactly as the browser does — no HTML scraping / headless browser. |
 | `eutraining` | `eutraining.eu` | **disabled** — robots.txt disallows AI bots + `ai-train=no`, Cloudflare 403 to non-browser UAs. Not scraped pending a separate decision. |
 
 - Honours each host's `robots.txt` (stdlib `urllib.robotparser`); disallowed URLs
