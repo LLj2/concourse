@@ -149,14 +149,11 @@ The reasoning: at three engineers shipping evenings, formal review slows us more
 
 ## What is happening this week
 
-1. **Stefano sign-off on Compass cognitive dimensions: done** (2026-06-22). His ✅ on the High/Medium/Low priority assessment unblocks the build.
-2. **Three open product decisions** before commit 1 of Compass:
-   - Few-shot EPSO items for the generator — does Stefano have a clean source of 5-10 real verbal items to use as generation anchors, or do we author them in a 30-min call?
-   - Daily generation cap default per user (proposal: 50 items/day; configurable).
-   - "Practice" vs. "Calibration" navigation positioning on `/me` (proposal: equal billing).
-3. **Giovanni** starts commit 1 of Compass on branch `giovanni/practice-mode` once the three above are settled.
-4. **Leonardo** continues on infra hardening: custom SMTP setup (Resend), dev/staging Supabase split, secret rotation per `HANDOVER_SECRETS §7`.
-5. **Stefano** spends ~45 min on the verbal-generation prompt with Giovanni before commit 2 of Compass, then ~1 hour reviewing a sample of 30 generated items before we flip the generator on publicly.
+1. **Stefano sign-off on Compass cognitive dimensions: done** (2026-06-22). His ✅ on the High/Medium/Low priority assessment unblocked the build.
+2. **Compass M1 shipped** (2026-06-22): commit 1 (schema migration 003) and commit 2 (item generation pipeline) are both on `main`. Few-shot anchors and the gen-cap default are resolved (see `ROADMAP.md` §4.5). One product decision still open: "Practice" vs. "Calibration" positioning on `/me` (needed for commit 4).
+3. **Giovanni** is on **commit 3** (bank-first practice picker) on `giovanni/practice-mode`.
+4. **Leonardo** continues on infra hardening + the EPSO content scrapers (`tools/epso_benchmark/`); dev/staging Supabase split is deferred to a pre-pilot gate (`ROADMAP.md` §6).
+5. **Stefano** spends ~1 hour reviewing a sample of ~30 generated items before we flip the generator on publicly (`COMPASS_AUTOAPPROVE_GENERATED`).
 
 ---
 

@@ -47,7 +47,7 @@ The architectural keystone (fixes Risks 1, 3, 5 at once): **the product measures
 | Session 4 | Scoring + profile + first JSON-schema-validated LLM call | ✅ Done (2026-06-20) |
 | Sessions 6–7 | Plan generation (master + daily rule engine) | ✅ Done (2026-06-20) |
 | Session 8 | Logging layer C (adherence) + event-driven replan | ✅ Done (2026-06-20) |
-| **Compass — flagship feature** | **Adaptive practice engine: dimension-tagged items, pattern detection, self-correcting schema** | 🟡 **In flight (started 2026-06-22)** — see §4.5 below |
+| **Compass — flagship feature** | **Adaptive practice engine: dimension-tagged items, pattern detection, self-correcting schema** | 🟡 **In flight — M1 done** (commits 1–2 merged 2026-06-22); M2–M3 next. See §4.5 |
 | Diagnostic breadth | Numerical/abstract/EU item banks | 🟡 Replaced by Compass — generation pipeline produces them on demand |
 | Session 9 | Stripe trial + paywall + funnel instrumentation | ⛔ Blocked — Stripe account/owner (#4); deferred until Compass v1 ships |
 | Layer B | Screenshot/paste → LLM parse | ❌ Dropped — Compass platform-native testing is the moat instead |
@@ -108,17 +108,17 @@ See `COMPASS_ROADMAP.md` for the full 6-commit build plan (phasing, risks, calen
 - [ ] **Commit 5** — Pattern-analysis worker: LLM reads `dimension_mastery` matrix, writes 1-3 plain-English patterns + focus dimensions per user×skill. Triggered on session end (≥20 responses since last analysis). Extends Leonardo's `replan_signal()` to fire on `pattern_updated`.
 - [ ] **Commit 6** — Validation pipeline: `/admin/dimensions/health` shows discrimination check (top-quartile vs bottom-quartile accuracy per dimension), predictivity check (mastery at T vs score at T+N), emergent-pattern detection (monthly LLM pass surfacing clusters that don't map to v1 dimensions). This makes the schema self-correcting.
 
-### Open decisions before commit 1 (settle this week)
-- [ ] **Few-shot EPSO items** for the verbal generator — does Stefano have 5-10 real items + correct answers, or do we author them in a 30-min call?
-- [ ] **Daily generation cap default** — 50 items/user/day proposed; confirm or override.
-- [ ] **Practice vs. Calibration positioning on `/me`** — equal billing (recommended) vs Calibration headline.
+### Open decisions (commit-1 ones now resolved by the shipped code)
+- [x] **Few-shot EPSO items** for the verbal generator — resolved: 10 real EPSO AST verbal items extracted from `epso_benchmark_data` live in `backend/compass/few_shot/verbal_epso_anchors.json`. No authoring session needed; Stefano's review shifts to spot-checking generated output.
+- [x] **Daily generation cap default** — shipped at `COMPASS_DAILY_GEN_CAP=200` (org-global, dev). Revisit a per-user cap in commit 4 when real users exist.
+- [ ] **Practice vs. Calibration positioning on `/me`** — still open; needed for commit 4 (Practice UI). Equal billing (recommended) vs Calibration headline.
 
 ### Infra dependencies (Leonardo's track)
 - [ ] **Custom SMTP** (Resend) — not blocking Compass build, but needed before pilot in week 4 for reliable magic-link delivery.
 - [ ] **Dev/staging Supabase split** (issue #3) — **decided 2026-06-23: not now.** No real users yet, so the current project stays as dev/staging and we cut a fresh **prod** Supabase as a mandatory pre-pilot gate (see §6). Migration 003 therefore just runs on the current DB — only pick a window when no teammate is mid-test (ping on WhatsApp first).
 
 ### Calendar target (~4 weeks)
-- **Week 1** (2026-06-22 → 2026-06-28): Commit 1 ships; Commit 2 prompt-tuning with Stefano starts.
+- **Week 1** (2026-06-22 → 2026-06-28): ✅ Commit 1 **and** Commit 2 both shipped 2026-06-22 (ahead of plan — M1 done day 1). Commit 3 next.
 - **Week 2**: Commit 2 ships; Commit 3 ships; Commit 4 starts. **End of week 2 = Compass v0.5 (M1+M2 done, practice loop live, no insight layer).**
 - **Week 3**: Commit 4 ships; Commit 5 ships. Insight panel renders for real users.
 - **Week 4** (target 2026-07-20): Commit 6 ships. **Compass v1 live.**

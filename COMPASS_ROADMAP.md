@@ -329,7 +329,7 @@ Assuming **2-3 evening sessions per week** (90 min each) for Giovanni:
 
 | Week | Sessions | Commits | Compass status |
 |---|---|---|---|
-| **Week 1** (this week) | 2-3 | Commit 1 ships; Commit 2 prompt tuning with Stefano | M1 nearly done |
+| **Week 1** (this week) | 2-3 | ✅ Commit 1 + Commit 2 both shipped 2026-06-22; Commit 3 next | **M1 done** |
 | **Week 2** | 2-3 | Commit 2 ships; Commit 3 ships; Commit 4 starts | M1 done, M2 in flight |
 | **Week 3** | 2-3 | Commit 4 ships; Commit 5 ships | M2 done, M3 in flight |
 | **Week 4** | 1-2 | Commit 6 ships; pilot recruiting starts | M3 done. **Compass v1 live.** |
@@ -345,11 +345,11 @@ If the schedule slips, the M1/M2/M3 phasing means we can ship M1+M2 as "Compass 
 
 ## 4. What blocks the build right now
 
-**Three open product decisions before commit 1:**
+**Product decisions (commit-1/2 ones now resolved by the shipped code):**
 
-1. ~~**Few-shot anchors for the verbal generator.**~~ ✅ Resolved 2026-06-22: 10 real EPSO AST verbal items extracted from the `epso_benchmark_data` download into `backend/ai/few_shot/verbal_epso_anchors.json`. Commit 2 wires them in directly.
-2. **Daily generation cap default.** 50 items/user/day proposed. *Decision needed: before commit 2.*
-3. **Practice vs. Calibration on `/me`.** Equal billing or Calibration as headline? Proposal: equal. *Decision needed: before commit 4.*
+1. ~~**Few-shot anchors for the verbal generator.**~~ ✅ Resolved 2026-06-22: 10 real EPSO AST verbal items extracted from the `epso_benchmark_data` download into `backend/compass/few_shot/verbal_epso_anchors.json`. Commit 2 wires them in directly.
+2. ~~**Daily generation cap default.**~~ ✅ Shipped 2026-06-22 at `COMPASS_DAILY_GEN_CAP=200` (org-global for dev); revisit a per-user cap in commit 4.
+3. **Practice vs. Calibration on `/me`.** Equal billing or Calibration as headline? Proposal: equal. *Still open — needed before commit 4.*
 
 **Two infra dependencies on Leonardo's track:**
 
