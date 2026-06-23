@@ -165,6 +165,18 @@ def finalize_practice_session(db: Session, session_id: str) -> dict:
     # Build the dimensional observation for the end-screen
     observation = _build_dimensional_observation(db, session_id)
 
+    # Trigger pattern analysis if eligible (≥20 tagged answers, not refreshed recently).
+    # Errors here are non-fatal — pattern analysis must never block a finished session.
+    if sess is not None:
+        try:
+            from backend.compass import patterns as compass_patterns
+            compass_patterns.run_pattern_analysis(db, user_id=str(sess[0]), skill_id=sess[1])
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).exception(
+                "pattern analysis raised during finalize; swallowing"
+            )
+
     return {
         "session_id": session_id,
         "items_attempted": items_attempted,

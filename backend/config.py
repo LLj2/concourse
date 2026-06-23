@@ -31,5 +31,10 @@ class Settings(BaseModel):
     # to the picker until a human flips them. Flip to true once first ~30 items audit clean.
     compass_autoapprove_generated: bool = os.getenv("COMPASS_AUTOAPPROVE_GENERATED", "false").lower() == "true"
 
+    # --- Admin (dimension-health dashboard, /admin/compass/*) ---
+    # Shared secret that gates /admin/compass/health. Same pattern as dora's practitioner PIN.
+    # Default '1234' in dev; in production set to a long random string.
+    admin_pin: str = os.getenv("ADMIN_PIN", "1234")
+
 
 settings = Settings()

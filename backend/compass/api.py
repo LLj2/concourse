@@ -12,13 +12,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user
+from backend.compass import patterns as compass_patterns
 from backend.compass import practice
+from backend.compass import validation as compass_validation
+from backend.config import settings
 from backend.db.database import get_db
 
 router = APIRouter()
@@ -182,6 +185,32 @@ def practice_recent(
 # Insight panel (read of latest pattern_analyses)
 # =============================================================================
 
+@router.post("/api/compass/patterns/refresh")
+def compass_patterns_refresh(
+    payload: dict = Body(default={}),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Manually trigger a pattern analysis for this user.
+
+    Body: {"skill_id": "verbal", "force": false}.
+    Honors should_refresh() unless force=true. Returns the saved analysis dict
+    or {"skipped": true, "reason": "..."} on a soft skip.
+    """
+    skill_id = (payload or {}).get("skill_id", "verbal")
+    force = bool((payload or {}).get("force"))
+    if not force:
+        ok, reason = compass_patterns.should_refresh(db, user_id=user["user_id"], skill_id=skill_id)
+        if not ok:
+            return {"skipped": True, "reason": reason}
+    result = compass_patterns.run_pattern_analysis(
+        db, user_id=user["user_id"], skill_id=skill_id, force=True
+    )
+    if result is None:
+        return {"skipped": True, "reason": "llm_failure_see_logs"}
+    return {"ok": True, "analysis": result}
+
+
 @router.get("/api/compass/insight")
 def compass_insight(
     user: dict = Depends(get_current_user),
@@ -190,8 +219,7 @@ def compass_insight(
     """Latest pattern analysis for the user (any skill, most-recent wins).
 
     Returns 404 with a structured body when no analysis exists yet (the /me
-    page hides the panel on 404). The pattern-analysis worker lands in commit 5;
-    until then this always returns 404, which is the correct degradation.
+    page hides the panel on 404).
     """
     row = db.execute(
         text(
@@ -233,3 +261,105 @@ def flag_item(
     )
     db.commit()
     return {"ok": True, "archived_now": (res.rowcount or 0) > 0}
+
+
+# =============================================================================
+# Admin: dimension-health dashboard
+# =============================================================================
+#
+# Gated by ?pin=<ADMIN_PIN>. Same dev-PIN pattern as dora's practitioner panel —
+# good enough for an internal tool with no real users yet. Bring back proper auth
+# (cookie + session table) before going live with users.
+
+def _check_admin_pin(pin: Optional[str]) -> None:
+    if not pin or pin != settings.admin_pin:
+        raise HTTPException(status_code=401, detail="admin_pin_required_or_invalid")
+
+
+@router.get("/admin/compass/health", response_class=HTMLResponse)
+def compass_health_dashboard(
+    pin: Optional[str] = Query(default=None),
+    skill: str = Query(default="verbal"),
+    db: Session = Depends(get_db),
+):
+    """Server-rendered HTML page with discrimination + predictivity + emergent
+    rows. Read-only; uses ?pin=<ADMIN_PIN> for access."""
+    _check_admin_pin(pin)
+
+    disc = compass_validation.discrimination_check(db, skill)
+    pred = compass_validation.predictivity_check(db, skill)
+    emrg = compass_validation.emergent_patterns(db, skill)
+
+    # Build the discrimination table
+    if disc["rows"]:
+        disc_html = ['<table><thead><tr><th>Dimension</th><th>Value</th>'
+                     '<th>Top quartile %</th><th>Bottom quartile %</th>'
+                     '<th>Gap (pp)</th><th>Total attempts</th></tr></thead><tbody>']
+        for r in disc["rows"]:
+            gap_str = f"{r.gap_pct_points:+.1f}" if r.gap_pct_points is not None else "—"
+            disc_html.append(
+                f"<tr><td>{r.dimension_name}</td><td>{r.dimension_value}</td>"
+                f"<td>{r.top_quartile_accuracy_pct or '—'}</td>"
+                f"<td>{r.bottom_quartile_accuracy_pct or '—'}</td>"
+                f"<td><b>{gap_str}</b></td>"
+                f"<td>{r.n_attempts_total}</td></tr>"
+            )
+        disc_html.append("</tbody></table>")
+        disc_table = "".join(disc_html)
+    else:
+        disc_table = (
+            f'<p style="color:#888"><em>Insufficient data — need ≥{disc["min_users_threshold"]} '
+            f'users with mastery data; currently {disc["n_users"]}.</em></p>'
+        )
+
+    pred_block = (
+        f'<p style="color:#888"><em>Status: {pred["status"]}. '
+        f'Users with re-calibration data: {pred["n_users_with_recalibration"]} '
+        f'(need ≥{pred["min_users_threshold"]}).</em></p>'
+    )
+
+    emrg_block = (
+        f'<p style="color:#888"><em>Status: {emrg["status"]}. '
+        f'Practice users on this skill: {emrg["n_practice_users"]} '
+        f'(need ≥{emrg["min_users_threshold"]} for the monthly LLM pass).</em></p>'
+    )
+
+    html = f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Compass — dimension health ({skill})</title>
+<style>
+body {{ font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 1100px; margin: 30px auto; padding: 0 24px; color: #0f1d3a; }}
+h1 {{ font-size: 22px; }}
+h2 {{ font-size: 16px; color: #1e63d6; margin-top: 28px; border-bottom: 1px solid #e5e9f2; padding-bottom: 6px; }}
+.note {{ background: #fff8e1; padding: 10px 14px; border-left: 3px solid #d99c12; border-radius: 4px; font-size: 13px; margin-bottom: 18px; }}
+table {{ border-collapse: collapse; width: 100%; font-size: 13px; }}
+th, td {{ border: 1px solid #e5e9f2; padding: 6px 10px; text-align: left; }}
+th {{ background: #f0f4fb; }}
+tr:nth-child(even) td {{ background: #fafbfc; }}
+.skill-picker {{ font-size: 14px; }}
+.skill-picker a {{ margin-right: 12px; color: #1e63d6; text-decoration: none; }}
+.skill-picker a.current {{ font-weight: 700; color: #0f1d3a; }}
+</style></head><body>
+<h1>Compass — dimension health</h1>
+<div class="skill-picker">
+  Skill:
+  <a href="?pin={pin}&skill=verbal" class="{'current' if skill == 'verbal' else ''}">verbal</a>
+  <a href="?pin={pin}&skill=numerical" class="{'current' if skill == 'numerical' else ''}">numerical</a>
+  <a href="?pin={pin}&skill=abstract" class="{'current' if skill == 'abstract' else ''}">abstract</a>
+  <a href="?pin={pin}&skill=eu_knowledge" class="{'current' if skill == 'eu_knowledge' else ''}">eu_knowledge</a>
+</div>
+<div class="note"><b>How to read this.</b> Discrimination = does the dimension separate strong from weak users?
+Predictivity = does mastery now correlate with future score? Emergent = LLM pass for patterns not in the v1 schema.
+Big gaps mean the dimension is doing real work; small gaps mean it's a candidate for removal.</div>
+
+<h2>1. Discrimination — top vs bottom quartile</h2>
+<p style="font-size:13px;color:#555">Users with mastery data: <b>{disc['n_users']}</b>
+(threshold: {disc['min_users_threshold']}).</p>
+{disc_table}
+
+<h2>2. Predictivity — mastery now → future score</h2>
+{pred_block}
+
+<h2>3. Emergent patterns — LLM pass for what we missed</h2>
+{emrg_block}
+</body></html>"""
+    return HTMLResponse(content=html)
