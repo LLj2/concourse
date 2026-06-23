@@ -47,7 +47,7 @@ The architectural keystone (fixes Risks 1, 3, 5 at once): **the product measures
 | Session 4 | Scoring + profile + first JSON-schema-validated LLM call | ✅ Done (2026-06-20) |
 | Sessions 6–7 | Plan generation (master + daily rule engine) | ✅ Done (2026-06-20) |
 | Session 8 | Logging layer C (adherence) + event-driven replan | ✅ Done (2026-06-20) |
-| **Compass — flagship feature** | **Adaptive practice engine: dimension-tagged items, pattern detection, self-correcting schema** | 🟡 **In flight — M1 + M2 done (Compass v0.5 live)** (commits 1–2 merged 2026-06-22; commits 3–4 merged 2026-06-23); M3 (pattern analysis + validation pipeline) next. See §4.5 |
+| **Compass — flagship feature** | **Adaptive practice engine: dimension-tagged items, pattern detection, self-correcting schema** | ✅ **Compass v1 live** — M1+M2+M3 all done (commits 1–2 on 2026-06-22; commits 3–4 on 2026-06-23; commits 5–6 on 2026-06-23). See §4.5 |
 | Diagnostic breadth | Numerical/abstract/EU item banks | 🟡 Replaced by Compass — generation pipeline produces them on demand |
 | Session 9 | Stripe trial + paywall + funnel instrumentation | ⛔ Blocked — Stripe account/owner (#4); deferred until Compass v1 ships |
 | Layer B | Screenshot/paste → LLM parse | ❌ Dropped — Compass platform-native testing is the moat instead |
@@ -104,9 +104,10 @@ See `COMPASS_ROADMAP.md` for the full 6-commit build plan (phasing, risks, calen
 - [x] **Commit 3** ✅ Shipped 2026-06-23 (`4104ed1`) — Bank-first practice picker + sessions API: 60% focus / 30% weak / 10% control distribution; reads `pattern_analyses.focus_dimensions`; generates only when bank is dry. `POST /api/compass/practice/{start,answer,end}`, `GET /api/compass/practice/recent`. `record_practice_answer` upserts `dimension_mastery` per dimension on every answer; emits `practice_completed` event on finalize.
 - [x] **Commit 4** ✅ Shipped 2026-06-23 (`4104ed1`) — Practice UI + insight panel: `/compass` page (skill+length picker, immediate feedback, dimensional end-screen, "Report this question" archives item); `/me` adds a Compass CTA + insight panel (reads `/api/compass/insight`, hidden on 404 = graceful) + recent-practice list. Daily-plan deep-linking deferred to M3 (one-line change once pattern analysis exists).
 
-### Milestone M3 — The moat (commits 5–6, ~2 sessions)
-- [ ] **Commit 5** — Pattern-analysis worker: LLM reads `dimension_mastery` matrix, writes 1-3 plain-English patterns + focus dimensions per user×skill. Triggered on session end (≥20 responses since last analysis). Extends Leonardo's `replan_signal()` to fire on `pattern_updated`.
-- [ ] **Commit 6** — Validation pipeline: `/admin/dimensions/health` shows discrimination check (top-quartile vs bottom-quartile accuracy per dimension), predictivity check (mastery at T vs score at T+N), emergent-pattern detection (monthly LLM pass surfacing clusters that don't map to v1 dimensions). This makes the schema self-correcting.
+### Milestone M3 — The moat (commits 5–6, ~2 sessions) ✅ DONE — Compass v1 live
+- [x] **Commit 5** ✅ Shipped 2026-06-23 (`3660e9f`) — Pattern-analysis worker: `backend/compass/patterns.py`. LLM reads `dimension_mastery` + recent-session summaries + distractor-class frequencies, writes 1-3 plain-English patterns + 3-5 focus_dimensions + an 80-150 word `insight_md` to `pattern_analyses`. Triggered on session end via `practice.finalize_practice_session` (≥20 tagged answers + 30-min cooldown). Errors swallowed so analysis never blocks a session. Manual trigger: `POST /api/compass/patterns/refresh`. Smoke-tested: LLM correctly identified a polarity-reversal cluster in rigged 20-answer data.
+- [x] **Commit 6** ✅ Shipped 2026-06-23 (`3660e9f`) — Validation pipeline: `backend/compass/validation.py` + `GET /admin/compass/health`. Three read-only checks: discrimination (top-quartile vs bottom-quartile accuracy per dimension value; needs ≥20 users), predictivity (mastery-at-T vs score-at-T+N; needs re-calibration data), emergent (LLM pass for unmapped clusters; needs ≥50 practice users). Server-rendered HTML, gated by `?pin=<ADMIN_PIN>` (default `1234` in dev). All three return "insufficient data" with current/threshold counts until we have real users.
+- Daily-plan deep-linking into Compass: deferred to a small follow-up (one-line change in `backend/logic/planning.py` once a pilot is running and produces task_type='practice' slots).
 
 ### Open decisions (commit-1 ones now resolved by the shipped code)
 - [x] **Few-shot EPSO items** for the verbal generator — resolved: 10 real EPSO AST verbal items extracted from `epso_benchmark_data` live in `backend/compass/few_shot/verbal_epso_anchors.json`. No authoring session needed; Stefano's review shifts to spot-checking generated output.
@@ -120,8 +121,7 @@ See `COMPASS_ROADMAP.md` for the full 6-commit build plan (phasing, risks, calen
 ### Calendar target (~4 weeks)
 - **Week 1** (2026-06-22 → 2026-06-28): ✅ Commit 1 **and** Commit 2 both shipped 2026-06-22 (ahead of plan — M1 done day 1). Commit 3 next.
 - **Week 2** (2026-06-23 →): ✅ Commits 3+4 shipped 2026-06-23 — **Compass v0.5 live**: M1+M2 done, practice loop end-to-end (`/compass` page, picker, mastery upserts, recent-sessions panel on `/me`). M3 (pattern analysis + validation pipeline) is what remains for v1.
-- **Week 3**: Commit 4 ships; Commit 5 ships. Insight panel renders for real users.
-- **Week 4** (target 2026-07-20): Commit 6 ships. **Compass v1 live.**
+- **Week 3** — collapsed into Week 2 (commits 5+6 shipped 2026-06-23 alongside 3+4). **Compass v1 live ~4 weeks ahead of the 2026-07-20 target.**
 - **Weeks 5-6**: 10-30 pilot users on Compass, weekly review of `/admin/dimensions/health`.
 - **Week 7**: Stefano review on real data → schema v2 plan.
 
