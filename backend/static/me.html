@@ -105,6 +105,28 @@
       <a class="btn btn-primary" href="/diagnostic">Start</a>
     </section>
 
+    <!-- Compass card -->
+    <section class="card cta" id="compass-card">
+      <div class="copy">
+        <h3>Practice with Compass</h3>
+        <p>Adaptive verbal practice. Each question is generated to target the patterns we've identified in your previous answers.</p>
+      </div>
+      <a class="btn btn-primary" href="/compass">Practice</a>
+    </section>
+
+    <!-- Compass insight panel — hidden when no analysis exists yet (404 from /api/compass/insight) -->
+    <section class="card hidden" id="compass-insight-card">
+      <h3>What we have learned about you</h3>
+      <div id="compass-insight-body" style="font-size: 14px; line-height: 1.6;"></div>
+      <div id="compass-insight-meta" style="font-size: 12px; color: var(--muted); margin-top: 10px;"></div>
+    </section>
+
+    <!-- Compass recent sessions — hidden until ≥1 completed session exists -->
+    <section class="card hidden" id="compass-recent-card">
+      <h3>Recent practice</h3>
+      <div id="compass-recent-list" style="font-size: 14px;"></div>
+    </section>
+
     <section class="card">
       <h3>Latest scores</h3>
       <div id="scores-empty" class="stub">No calibration data yet — start above to see your baseline.</div>
@@ -197,6 +219,48 @@
       await fetch('/api/auth/logout', { method: 'POST' });
       window.location.replace('/');
     });
+
+    // =====================================================================
+    // Compass — insight panel + recent sessions
+    // Both endpoints return 404 cleanly when Compass has nothing yet,
+    // and the panels degrade by staying hidden. If Compass is removed,
+    // these fetches 404 and /me works exactly as before.
+    // =====================================================================
+    (async function loadCompassInsight() {
+      try {
+        var r = await fetch('/api/compass/insight');
+        if (!r.ok) return; // 404 = no analysis yet; panel stays hidden
+        var d = await r.json();
+        var bodyEl = document.getElementById('compass-insight-body');
+        // Render the markdown insight as plain text (markdown rendering is overkill for one paragraph)
+        bodyEl.textContent = d.insight_md || '';
+        document.getElementById('compass-insight-meta').textContent =
+          'Updated ' + new Date(d.generated_at).toLocaleString() + ' · skill: ' + (d.skill_id || '—');
+        document.getElementById('compass-insight-card').classList.remove('hidden');
+      } catch (e) { /* swallow */ }
+    })();
+
+    (async function loadCompassRecent() {
+      try {
+        var r = await fetch('/api/compass/practice/recent');
+        if (!r.ok) return;
+        var d = await r.json();
+        var sessions = d.sessions || [];
+        if (!sessions.length) return;
+        var listEl = document.getElementById('compass-recent-list');
+        listEl.innerHTML = '';
+        sessions.forEach(function (s) {
+          var when = new Date(s.completed_at).toLocaleDateString();
+          var acc = s.items_attempted ? Math.round(100 * s.items_correct / s.items_attempted) : 0;
+          var row = document.createElement('div');
+          row.style.cssText = 'padding: 8px 0; border-bottom: 1px solid var(--border);';
+          row.innerHTML = when + ' · ' + s.skill_id + ' · ' +
+            s.items_correct + '/' + s.items_attempted + ' (' + acc + '%)';
+          listEl.appendChild(row);
+        });
+        document.getElementById('compass-recent-card').classList.remove('hidden');
+      } catch (e) { /* swallow */ }
+    })();
   </script>
 </body>
 </html>

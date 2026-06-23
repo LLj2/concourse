@@ -16,6 +16,7 @@ from backend.logic import scoring as sc
 from backend.logic import planning as pl
 from backend.logic import adherence as ad
 from backend.ai import client as ai
+from backend.compass.api import router as compass_router
 
 app = FastAPI(title="Concourse", version="0.1.0")
 
@@ -23,6 +24,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 app.include_router(auth_router)
+app.include_router(compass_router)
 
 
 # ---------- public pages ----------
