@@ -1,7 +1,7 @@
 # Concourse — Roadmap
 
 > **Shared, trackable plan.** Tick boxes as work lands. Keep this file honest — it is the single source of truth for "what's done / what's next."
-> **Last updated:** 2026-06-22
+> **Last updated:** 2026-06-23
 > **Target launch:** first half of September 2026 (~12 weeks from the 2026-06-18 plan).
 > **Sources:** `CONTEXT.md`, `EPSO-Planner-MVP-Build-Plan.md`, `HANDOFF.md`, `OVERVIEW.md`, `COGNITIVE_DIMENSIONS.md`, `COMPASS_ROADMAP.md`. This roadmap does not invent scope beyond those.
 
@@ -97,8 +97,8 @@ See `COMPASS_ROADMAP.md` for the full 6-commit build plan (phasing, risks, calen
 - [x] **Documented** in `COGNITIVE_DIMENSIONS.md` (full schema) + `OVERVIEW.md` (the channel-onboarding doc) + `COMPASS_ROADMAP.md` (the engineering plan).
 
 ### Milestone M1 — Foundation (commits 1–2, ~2.5 sessions)
-- [ ] **Commit 1** — Schema migration 003: `items.dimensions` JSONB, `items.option_diagnostics` JSONB, new `practice_sessions`, `dimension_mastery`, `pattern_analyses` tables.
-- [ ] **Commit 2** — Item generation pipeline: `backend/ai/generate_item.py` with target-dimension dict + JSON-schema-validated output; ~45 min Stefano-calibration session on the verbal generator prompt; cost guard (`COMPASS_DAILY_GEN_CAP` env, default 50/user/day).
+- [x] **Commit 1** — Schema migration 003 (`f2be545`, 2026-06-22): `items` +6 JSONB/typed cols, new `practice_sessions`, `dimension_mastery`, `pattern_analyses` tables, `item_responses` XOR constraint. Idempotent, single transaction with in-tx assertions. Code sealed under `backend/compass/`.
+- [x] **Commit 2** — Item generation pipeline (`e779257`, 2026-06-22): `backend/compass/generate_item.py` + `item_schema.py` + `prompts/verbal.py`, JSON-schema-validated via forced tool-call, 10 real EPSO verbal few-shot anchors. Cost guard `COMPASS_DAILY_GEN_CAP` (shipped default **200 org-global** for dev, not 50/user — revisit per-user in commit 4); generated items land `archived=true` until audited.
 
 ### Milestone M2 — Practice loop live (commits 3–4, ~2 sessions)
 - [ ] **Commit 3** — Bank-first practice picker + sessions API: 60% focus / 30% weak / 10% control distribution; reads `pattern_analyses.focus_dimensions`; generates only when bank is dry. `POST /api/practice/start|answer|end`.
@@ -115,7 +115,7 @@ See `COMPASS_ROADMAP.md` for the full 6-commit build plan (phasing, risks, calen
 
 ### Infra dependencies (Leonardo's track)
 - [ ] **Custom SMTP** (Resend) — not blocking Compass build, but needed before pilot in week 4 for reliable magic-link delivery.
-- [ ] **Dev/staging Supabase split** (issue #3) — coordinate timing before running migration 003 on the shared DB.
+- [ ] **Dev/staging Supabase split** (issue #3) — **decided 2026-06-23: not now.** No real users yet, so the current project stays as dev/staging and we cut a fresh **prod** Supabase as a mandatory pre-pilot gate (see §6). Migration 003 therefore just runs on the current DB — only pick a window when no teammate is mid-test (ping on WhatsApp first).
 
 ### Calendar target (~4 weeks)
 - **Week 1** (2026-06-22 → 2026-06-28): Commit 1 ships; Commit 2 prompt-tuning with Stefano starts.
@@ -188,7 +188,7 @@ Sequencing follows `EPSO-Planner-MVP-Build-Plan.md §6`. The credibility-critica
 
 Tracked so they don't get lost behind feature work:
 - [ ] **Custom SMTP** (e.g. Resend) → kills the ~2/hour built-in email rate limit, makes email production-grade, and **activates the 6-digit OTP code path** (template editing requires SMTP). Fixes the Gmail link-scanner problem for real users.
-- [ ] **Separate dev/staging Supabase from production** — currently a single shared DB; test data mixes with real. → **issue #3**.
+- [ ] **Cut a fresh production Supabase before the first real users — MANDATORY GATE.** Decided 2026-06-23: don't split now (no real users yet), so the current project (`pyxtjeivttswfnyushtw`) stays as **dev/staging**. Before the closed pilot recruits real people (§5 weeks 10–11 — *this*, not public launch, is when metrics must be clean), create a clean **prod** Supabase, run migrations `001→003` on it, point Railway prod at it, and keep the current one as dev. Keeps pilot/launch metrics (conversion, week-3 retention, CAC — §1) uncontaminated by test data. → **issue #3**.
 - [ ] **Diagnostic engine hardening** (validate answered item, 4xx-not-500 on bad input, calibration skew) → **issue #2**.
 - [ ] **Rotate secrets** exposed in cleartext during handover: `SESSION_SECRET`, DB password, anon key, Anthropic key, and the `service_role` key (`HANDOVER_SECRETS.md §7`). Delete `HANDOVER_SECRETS.md` once stored in password managers.
 - [ ] **Clean production** of all test users/rows before the first real signup (done once on 2026-06-20; redo right before launch).
@@ -201,6 +201,7 @@ Tracked so they don't get lost behind feature work:
 
 - [x] **Source vs. author diagnostic items** — resolved 2026-06-22: in-platform generation via Compass (§4.5).
 - [x] **LLM model tier for dev** — resolved 2026-06-22: Haiku 4.5 in dev; production starts on Haiku and escalates only if quality demands it.
+- [x] **Dev/staging Supabase split timing** — resolved 2026-06-23: don't split now; the current DB stays dev/staging and a fresh prod Supabase is a mandatory pre-pilot gate (§6). Unblocks Compass migration 003, which now just runs on the current DB.
 - [ ] **Few-shot EPSO items** for the verbal generator (Stefano) — needed before Compass commit 2.
 - [ ] **First acquisition channels** to instrument (EPSO communities, LinkedIn, coach partnerships) + the paid-test budget.
 - [ ] **Stripe account owner** (revenue flows there) — not yet created; deferred until Compass v1 ships.
@@ -242,6 +243,15 @@ Product scope, sequence, hypotheses, and kill criteria are unchanged — only th
 
 ## 10. How to use this file
 
-- Update the status table (§3) and tick boxes (§5–6) as work merges.
+- **This file is the single source of truth for status.** Done/next and tick boxes live **only here**. The other docs explain the *how*, never the *done/to-do* — don't track status in two places (that's how `COMPASS_ROADMAP.md` and the §4.5 boxes drifted on 2026-06-22).
+- Update the status table (§3) and tick boxes (§4.5–§6) as work merges.
 - New non-trivial findings → open a GitHub issue and link it here (see #2, #3).
 - When the workflow changes (PRs/branch protection before launch), update `HANDOFF.md §9` and the §6 checkbox here.
+
+**Doc map** (what each file is for — keep it to one role each):
+- `ROADMAP.md` — product status + sequence (here). The only status tracker.
+- `COMPASS_ROADMAP.md` — the single Compass build doc (engineering detail, phasing, risks). `PRACTICE_FEATURE_PLAN.md` is **superseded** by it.
+- `COGNITIVE_DIMENSIONS.md` — the dimensions schema (data, not a plan).
+- `OVERVIEW.md` — team onboarding narrative; points here for status.
+- `HANDOFF.md` / `CONTEXT.md` / `EPSO-Planner-MVP-Build-Plan.md` — stack/handoff + original analysis.
+- `CLAUDE.md` — the always-loaded guardrails for any Claude Code instance on this repo.

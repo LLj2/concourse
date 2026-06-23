@@ -37,18 +37,9 @@ Three things sit underneath. If they hold, this works. If any breaks, we kill it
 
 ## Where we are right now (2026-06-22)
 
-The product is **live on a Railway URL with end-to-end auth + intake + diagnostic + plan generation working**. Eight sessions of vibe-coding so far, mostly evenings and weekends.
+The product is **live on a Railway URL with end-to-end auth + intake + diagnostic + plan generation working**, and **Compass M1 (commits 1–2: schema + item generation) has landed**. Eight sessions of vibe-coding so far, mostly evenings and weekends.
 
-| Phase | Scope | Status |
-|---|---|---|
-| Session 1 | Foundations — FastAPI, Supabase, schema, landing page | Done |
-| Session 2 | Auth (magic-link), short intake form, profile page | Done |
-| Session 3 | Verbal calibration mini-test, adaptive difficulty, 8 seed items | Done |
-| Session 4 | Scoring + profile + first LLM call with JSON-schema validation | Done |
-| Sessions 6-7 | Master plan + daily plan rule engine | Done |
-| Session 8 | One-tap daily adherence + event-driven replan trigger | Done |
-| Next | **Compass** — the adaptive practice engine. See below. | Designed; build starts this week |
-| Later | Payments, pilot recruiting, public launch | Sequenced, not started |
+> **Live status table moved.** To avoid two trackers drifting, the per-phase done/next status now lives **only** in `ROADMAP.md` §3 (the single source of truth). This file keeps the narrative; check the ROADMAP for what's done.
 
 Live URL (test it): https://web-production-71010.up.railway.app
 
@@ -101,7 +92,7 @@ The schema corrects itself with data. We are not freezing v1 and praying.
 | 5 | Pattern-analysis worker (LLM finds the patterns and writes them back) | 1 session |
 | 6 | Validation pipeline — the schema's self-correcting layer | 1 session |
 
-Full plan in `PRACTICE_FEATURE_PLAN.md`.
+Full plan in `COMPASS_ROADMAP.md`. Live commit status in `ROADMAP.md` §4.5.
 
 ---
 
@@ -135,7 +126,9 @@ The reasoning: at three engineers shipping evenings, formal review slows us more
 | `HANDOFF.md` | Onboarding as a new engineer — full stack, env vars, deploy steps |
 | `ROADMAP.md` | Single source of truth for done/next, tied to kill criteria |
 | `COGNITIVE_DIMENSIONS.md` | The Compass schema — every dimension, type, definition, rationale |
-| `PRACTICE_FEATURE_PLAN.md` | The 6-commit build plan for Compass |
+| `COMPASS_ROADMAP.md` | The single Compass build doc (6 commits, phasing, risks) |
+| `PRACTICE_FEATURE_PLAN.md` | ⚠️ superseded by `COMPASS_ROADMAP.md` — kept for history only |
+| `CLAUDE.md` | Guardrails auto-loaded by any Claude Code instance on this repo |
 | `Concourse-MVP-Features-and-Action-Plan_2026-06-18.docx` | Original feature deck reviewed by Stefano and Leonardo |
 
 ### Stack at a glance

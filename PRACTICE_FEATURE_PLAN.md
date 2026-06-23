@@ -1,5 +1,7 @@
 # Practice & Adaptive Learning — Feature Plan
 
+> ⚠️ **SUPERSEDED (2026-06-23).** This was the original engineering plan for the practice/adaptive feature. It is now folded into **`COMPASS_ROADMAP.md`**, the single Compass build doc (kept in sync with the code); live commit status lives in **`ROADMAP.md` §4.5**. Retained for history only — **don't update this file**; edit `COMPASS_ROADMAP.md` instead.
+
 > **Goal:** turn Concourse from a planner that *measures* into a platform where students *train*. Built on top of what already exists (diagnostic engine, scoring, planning, replan trigger, Anthropic client).
 > **Status:** ready to start coding once cognitive-dimensions v1 is signed off (it is — Stefano confirmed 2026-06-22).
 > **Branches:** all work under `giovanni/practice-mode`. Stefano OK'd the schema, Leonardo on standby for review.
