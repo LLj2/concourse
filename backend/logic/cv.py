@@ -163,6 +163,153 @@ def save_links(
     return {"linkedin_url": linkedin, "portfolio_url": portfolio, "other_links": others}
 
 
+# =============================================================================
+# CV-fit read — extract the CV text and let the LLM assess fit for the target
+# competition. This is a one-time STRATEGY MODIFIER (Risk-2): it narrates fit +
+# go/no-go and is stored on profiles.cv_fit_modifier; it never drives the measured
+# numeric allocation.
+# =============================================================================
+
+CV_FIT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string",
+                    "description": "2-3 sentence read of how this CV fits the target competition."},
+        "specialist_fit": {"type": "string", "enum": ["strong", "moderate", "weak", "unclear"],
+                           "description": "Fit for the field-related / specialist requirements of this competition."},
+        "relevant_strengths": {"type": "array", "items": {"type": "string"},
+                               "description": "1-3 CV facts that genuinely help for this competition."},
+        "gaps": {"type": "array", "items": {"type": "string"},
+                 "description": "1-3 gaps vs the competition's profile, if any."},
+        "go_no_go": {"type": "string", "enum": ["on_track", "tight", "at_risk"],
+                     "description": "Feasibility read for this competition given the CV."},
+        "alternatives": {"type": "array", "items": {"type": "string"},
+                         "description": "Other EPSO competitions that might fit better, if any."},
+        "strategy_note": {"type": "string",
+                          "description": "One actionable note on using this background in prep."},
+    },
+    "required": ["summary", "specialist_fit", "go_no_go", "strategy_note"],
+}
+
+_FIT_SYSTEM = (
+    "You are an EPSO preparation coach. You are given a candidate's CV text and the "
+    "competition they target (with the tests it uses). Assess fit honestly and "
+    "concretely. Rules: base everything strictly on the CV text given; never invent "
+    "experience; if the CV text is thin or unreadable, set specialist_fit='unclear' "
+    "and say so; CV-fit is a strategy modifier, not a score; be brief and EPSO-specific."
+)
+
+
+def extract_text(filename: str, data: bytes) -> str:
+    """Extract plain text from a CV. PDF via pypdf, DOCX via python-docx; legacy
+    .doc / unknown fall back to a best-effort decode."""
+    ext = _ext_of(filename)
+    if ext == ".pdf":
+        try:
+            import io
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(data))
+            return "\n".join((p.extract_text() or "") for p in reader.pages).strip()
+        except Exception as e:
+            raise CvError(f"pdf_parse_failed: {e}", status=502)
+    if ext == ".docx":
+        try:
+            import io
+            from docx import Document
+            doc = Document(io.BytesIO(data))
+            return "\n".join(p.text for p in doc.paragraphs).strip()
+        except Exception as e:
+            raise CvError(f"docx_parse_failed: {e}", status=502)
+    return data.decode("utf-8", errors="ignore").strip()
+
+
+def download_cv_bytes(storage_path: str) -> Optional[bytes]:
+    """Fetch the stored CV from the private bucket (server-side, service_role)."""
+    if not is_configured() or not storage_path:
+        return None
+    url = f"{_storage_base()}/{settings.supabase_cv_bucket}/{storage_path}"
+    try:
+        with httpx.Client(timeout=30) as client:
+            r = client.get(url, headers=_storage_headers())
+    except httpx.HTTPError:
+        return None
+    return r.content if r.status_code < 400 else None
+
+
+def _fit_user_msg(cv_text: str, competition: dict) -> str:
+    # Bound tokens: a CV rarely needs more than a few thousand chars for a fit read.
+    from backend.logic import catalog as cat
+    return (
+        "Candidate CV (text):\n" + cv_text[:6000]
+        + "\n\nTarget competition:\n"
+        + json.dumps({
+            "title": competition.get("title"),
+            "grade": competition.get("grade"),
+            "tests": cat.labels_for(competition.get("tests") or []),
+        }, default=str)
+        + "\n\nProduce the CV-fit read."
+    )
+
+
+def analyze_fit(db: Session, user_id: str) -> dict:
+    """Extract the CV text, run the LLM fit read, cache it on profiles. Raises
+    CvError for caller-fixable problems."""
+    from backend.ai import client as ai
+    from backend.logic import catalog as cat
+    if not ai.is_configured():
+        raise CvError("ai_not_configured", status=503)
+
+    row = db.execute(
+        text("select cv_storage_path, cv_filename, target_competition, "
+             "target_competition_ref from profiles where user_id = :u"),
+        {"u": user_id},
+    ).mappings().first()
+    if not row or not row["cv_storage_path"]:
+        raise CvError("no_cv", status=400)
+
+    data = download_cv_bytes(row["cv_storage_path"])
+    if not data:
+        raise CvError("cv_download_failed", status=502)
+    cv_text = extract_text(row["cv_filename"] or "cv", data)
+    if len(cv_text) < 50:
+        raise CvError("cv_text_unreadable", status=422)
+
+    competition = cat.resolve_for_profile(db, {
+        "target_competition": row["target_competition"],
+        "target_competition_ref": row["target_competition_ref"],
+    })
+    fit = ai.generate_json(
+        schema=CV_FIT_SCHEMA, system=_FIT_SYSTEM,
+        user=_fit_user_msg(cv_text, competition), tool_name="cv_fit", max_tokens=900,
+    )
+    db.execute(
+        text("update profiles set cv_fit_modifier = cast(:f as jsonb), updated_at = now() "
+             "where user_id = :u"),
+        {"f": json.dumps(fit), "u": user_id},
+    )
+    db.execute(
+        text("insert into events (user_id, kind, payload) values (:u, 'cv_fit_generated', :p)"),
+        {"u": user_id, "p": json.dumps({"specialist_fit": fit.get("specialist_fit"),
+                                        "go_no_go": fit.get("go_no_go")})},
+    )
+    db.commit()
+    return fit
+
+
+def cached_fit(db: Session, user_id: str) -> Optional[dict]:
+    """The stored cv_fit_modifier, or None."""
+    row = db.execute(
+        text("select cv_fit_modifier from profiles where user_id = :u"),
+        {"u": user_id},
+    ).mappings().first()
+    if not row or not row["cv_fit_modifier"]:
+        return None
+    fit = row["cv_fit_modifier"]
+    if isinstance(fit, str):
+        fit = json.loads(fit)
+    return fit
+
+
 def signed_url(storage_path: str, expires_in: int = 3600) -> Optional[str]:
     """Mint a short-lived download URL for a private-bucket object, or None."""
     if not is_configured() or not storage_path:
@@ -193,7 +340,7 @@ def get_status(db: Session, user_id: str) -> dict:
         {"u": user_id},
     ).mappings().first()
     if not row:
-        return {"has_cv": False, "configured": is_configured()}
+        return {"has_cv": False, "configured": is_configured(), "cv_fit": None}
     other = row["other_links"]
     if isinstance(other, str):
         other = json.loads(other)
@@ -205,5 +352,6 @@ def get_status(db: Session, user_id: str) -> dict:
         "linkedin_url": row["linkedin_url"],
         "portfolio_url": row["portfolio_url"],
         "other_links": other or [],
+        "cv_fit": cached_fit(db, user_id),
         "configured": is_configured(),
     }

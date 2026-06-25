@@ -192,6 +192,19 @@ def post_cv(
     return {"ok": True, **result}
 
 
+@app.post("/api/cv/fit")
+def post_cv_fit(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Run (and cache) the LLM CV-fit read for the target competition. Explicit
+    because it costs an LLM call — like /api/profile/narrate."""
+    try:
+        return {"cv_fit": cv.analyze_fit(db, user["user_id"])}
+    except cv.CvError as e:
+        raise HTTPException(status_code=e.status, detail=e.code)
+
+
 @app.get("/api/me")
 def get_me(
     user: dict = Depends(get_current_user),

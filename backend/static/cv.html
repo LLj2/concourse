@@ -98,6 +98,16 @@
         <span id="status"></span>
       </div>
     </form>
+
+    <section class="card" id="fit-card" style="display:none">
+      <h3>CV fit for your competition</h3>
+      <p class="help">A one-time AI read of how your background fits the tests your target competition uses. Informs your plan — it doesn't change your measured scores.</p>
+      <div id="fit-result"></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="fit-btn" type="button">Analyze my fit</button>
+        <span id="fit-status"></span>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -124,8 +134,55 @@
         var when = d.uploaded_at ? ' · uploaded ' + fmtDate(d.uploaded_at) : '';
         var link = d.download_url ? ' — <a href="' + d.download_url + '" target="_blank" rel="noopener">view</a>' : '';
         cur.innerHTML = '✓ On file: <strong>' + name + '</strong>' + when + link;
+        document.getElementById('fit-card').style.display = 'block';
+        if (d.cv_fit) renderFit(d.cv_fit);
       }
     })();
+
+    var FIT_COLOR = { strong: '#137a3b', moderate: '#1e63d6', weak: '#c47b00', unclear: '#5a6b8a',
+                      on_track: '#137a3b', tight: '#c47b00', at_risk: '#c03' };
+    function chip(text, key) {
+      var c = FIT_COLOR[key] || '#5a6b8a';
+      return '<span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:' + c + '">' + text + '</span>';
+    }
+    function bullets(arr) {
+      if (!arr || !arr.length) return '';
+      return '<ul style="margin:6px 0 0;padding-left:18px">' + arr.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
+    }
+    function renderFit(fit) {
+      var el = document.getElementById('fit-result');
+      var html = '<div style="margin-bottom:8px">' +
+        chip('Specialist fit: ' + (fit.specialist_fit || '—'), fit.specialist_fit) + ' ' +
+        chip('Feasibility: ' + (fit.go_no_go || '—'), fit.go_no_go) + '</div>';
+      if (fit.summary) html += '<p style="margin:0 0 8px">' + fit.summary + '</p>';
+      if (fit.relevant_strengths && fit.relevant_strengths.length) html += '<div class="lab" style="font-weight:600;margin-top:8px">Relevant strengths</div>' + bullets(fit.relevant_strengths);
+      if (fit.gaps && fit.gaps.length) html += '<div class="lab" style="font-weight:600;margin-top:8px">Gaps</div>' + bullets(fit.gaps);
+      if (fit.strategy_note) html += '<p style="margin:10px 0 0"><strong>Strategy:</strong> ' + fit.strategy_note + '</p>';
+      if (fit.alternatives && fit.alternatives.length) html += '<div class="lab" style="font-weight:600;margin-top:8px">Competitions that might fit better</div>' + bullets(fit.alternatives);
+      el.innerHTML = html;
+      document.getElementById('fit-btn').textContent = 'Re-analyze';
+    }
+
+    document.getElementById('fit-btn').addEventListener('click', async function () {
+      var fs = document.getElementById('fit-status');
+      var fb = document.getElementById('fit-btn');
+      fs.className = ''; fs.textContent = ''; fb.disabled = true; fb.textContent = 'Analyzing…';
+      try {
+        var r = await fetch('/api/cv/fit', { method: 'POST' });
+        if (r.status === 401) { window.location.replace('/'); return; }
+        if (!r.ok) {
+          var detail = '';
+          try { detail = (await r.json()).detail; } catch (e) { detail = await r.text(); }
+          throw new Error(detail || 'failed');
+        }
+        renderFit((await r.json()).cv_fit);
+      } catch (e) {
+        fs.className = 'err'; fs.textContent = 'Could not analyze: ' + e.message;
+        fb.disabled = false; fb.textContent = 'Analyze my fit';
+        return;
+      }
+      fb.disabled = false;
+    });
 
     form.addEventListener('submit', async function (ev) {
       ev.preventDefault();

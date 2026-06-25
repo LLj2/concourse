@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from backend.ai import client as ai
 from backend.logic import scoring as sc
 from backend.logic import catalog as cat
+from backend.logic import cv as cv
 
 # Study areas the planner allocates across. Reasoning skills are measured;
 # eu_knowledge and test_strategy are driven by self-ratings until measured.
@@ -125,6 +126,7 @@ def _narrate_rationale(profile: dict, allocation: dict) -> Optional[str]:
         return None
     competition = allocation.get("competition") or {}
     comp_tests = competition.get("tests") or []
+    cv_fit = allocation.get("cv_fit") or {}
     try:
         out = ai.generate_json(
             schema=_RATIONALE_SCHEMA,
@@ -146,6 +148,7 @@ def _narrate_rationale(profile: dict, allocation: dict) -> Optional[str]:
                             "grade": competition.get("grade"),
                             "tests_you_will_face": cat.labels_for(comp_tests),
                         },
+                        "cv_fit": cv_fit or None,
                         "weekly_minutes_by_area": allocation["by_area"],
                     },
                     default=str,
@@ -177,6 +180,16 @@ def generate_master_plan(
     constraints = dict(profile.get("constraints") or {})
     constraints["target_competition_ref"] = cat.profile_target_ref(db, user_id)
     allocation["competition"] = cat.resolve_for_profile(db, constraints)
+
+    # Fold in the cached CV-fit read (a strategy modifier) so the narrative reflects
+    # the candidate's background. Best-effort: absent if they haven't run it.
+    fit = cv.cached_fit(db, user_id)
+    if fit:
+        allocation["cv_fit"] = {
+            "summary": fit.get("summary"),
+            "specialist_fit": fit.get("specialist_fit"),
+            "go_no_go": fit.get("go_no_go"),
+        }
 
     rationale = _narrate_rationale(profile, allocation)
 
