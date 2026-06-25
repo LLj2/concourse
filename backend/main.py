@@ -16,6 +16,7 @@ from backend.logic import scoring as sc
 from backend.logic import planning as pl
 from backend.logic import adherence as ad
 from backend.logic import cv as cv
+from backend.logic import catalog as cat
 from backend.ai import client as ai
 
 app = FastAPI(title="Concourse", version="0.1.0")
@@ -342,6 +343,19 @@ def narrate_profile(
     except Exception as e:  # transport / model error -> clean 502, not a 500 crash
         raise HTTPException(status_code=502, detail=f"ai_failed: {e}")
     return {"narrative": narrative}
+
+
+# ---------- competition catalog API (foundation flow) ----------
+
+@app.get("/api/competitions")
+def get_competitions(
+    status: Optional[str] = None,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Catalog of EPSO competitions (from the scraper). Empty list if the catalog
+    table isn't loaded yet — callers degrade gracefully."""
+    return {"competitions": cat.list_competitions(db, status=status)}
 
 
 # ---------- plan API (Sessions 6-7) ----------

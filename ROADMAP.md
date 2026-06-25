@@ -156,10 +156,16 @@ Much of the spine already exists (intake, scoring/gap, master plan, daily plan �
   plan. **Scraper built 2026-06-25** (`tools/epso_benchmark/catalog_scrape.py`, reuses
   the existing polite Crawler+Robots) — validated live: 7 in-progress competitions
   parsed, AD5-vs-AD7 test mixes differentiated, 7/7 with reference + Notice link;
-  `upcoming` (plain-text announcements) still best-effort. **Remaining:** a
-  `competitions` table + loader so the app reads it; wire the candidate's chosen
-  competition's tests into the Draft plan. *Owner: Leonardo (was Giovanni in the
-  minute — Leonardo took the scraper; coordinate with Giovanni so it isn't rebuilt).*
+  `upcoming` (plain-text announcements) still best-effort. **App wiring built
+  2026-06-25:** `competitions` table (migration 005, slug = natural key),
+  `load_catalog.py` loader (upsert from the scraped JSON), `backend/logic/catalog.py`
+  (resolve the candidate's competition + tests, with a grade-family fallback so it
+  works before the table is loaded), `GET /api/competitions`, and the Draft plan now
+  states which tests the candidate will face (rationale + `/plan` banner). **Remaining:**
+  run migration 005 + `load_catalog.py` on the shared DB (coordinate on Slack); add a
+  catalog picker to intake that sets `profiles.target_competition_ref` (until then the
+  fallback test map is used). *Owner: Leonardo (was Giovanni in the minute — coordinate
+  so it isn't rebuilt).*
 - [~] **CV upload** — Supabase Storage (private `cvs` bucket) + optional LinkedIn /
   portfolio links; mandatory for specialist competitions, optional otherwise. *Owner:
   Leonardo.* **Scaffolded 2026-06-25:** `backend/logic/cv.py`, `POST/GET /api/cv`,

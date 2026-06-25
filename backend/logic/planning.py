@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from backend.ai import client as ai
 from backend.logic import scoring as sc
+from backend.logic import catalog as cat
 
 # Study areas the planner allocates across. Reasoning skills are measured;
 # eu_knowledge and test_strategy are driven by self-ratings until measured.
@@ -122,13 +123,16 @@ _RATIONALE_SCHEMA = {
 def _narrate_rationale(profile: dict, allocation: dict) -> Optional[str]:
     if not ai.is_configured():
         return None
+    competition = allocation.get("competition") or {}
+    comp_tests = competition.get("tests") or []
     try:
         out = ai.generate_json(
             schema=_RATIONALE_SCHEMA,
             system=(
                 "You are an EPSO prep coach explaining a weekly study allocation to "
                 "the candidate. Be concrete and grounded in the numbers provided; "
-                "name the top priority; do not invent scores; keep it short."
+                "name the top priority; tie the focus to the tests THIS competition "
+                "actually uses; do not invent scores; keep it short."
             ),
             user=(
                 "Profile + allocation (JSON):\n"
@@ -137,11 +141,17 @@ def _narrate_rationale(profile: dict, allocation: dict) -> Optional[str]:
                         "measured": {k: v.get("score") for k, v in profile.get("measured", {}).items()},
                         "self_rated_1to5": profile.get("self_rated", {}),
                         "constraints": profile.get("constraints", {}),
+                        "competition": {
+                            "title": competition.get("title"),
+                            "grade": competition.get("grade"),
+                            "tests_you_will_face": cat.labels_for(comp_tests),
+                        },
                         "weekly_minutes_by_area": allocation["by_area"],
                     },
                     default=str,
                 )
-                + "\n\nWrite the rationale."
+                + "\n\nWrite the rationale. This is a first DRAFT plan that will "
+                "sharpen as the candidate practises — frame it that way."
             ),
             tool_name="plan_rationale",
         )
@@ -159,6 +169,15 @@ def generate_master_plan(
     """Compute + persist a master plan, superseding the previous active one."""
     profile = sc.build_profile(db, user_id)
     allocation = compute_allocation(profile)
+
+    # Resolve the candidate's competition + the tests they'll actually face, and
+    # attach to the allocation so it's persisted and shown on the plan. This
+    # informs the narrative + which areas we surface — NOT the measured numeric
+    # split (Risk-2: competition is a strategy modifier, not a daily driver).
+    constraints = dict(profile.get("constraints") or {})
+    constraints["target_competition_ref"] = cat.profile_target_ref(db, user_id)
+    allocation["competition"] = cat.resolve_for_profile(db, constraints)
+
     rationale = _narrate_rationale(profile, allocation)
 
     # Supersede the current active master plan.
