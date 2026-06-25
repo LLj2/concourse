@@ -19,6 +19,7 @@ from typing import Optional
 
 import httpx
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.config import settings
@@ -65,6 +66,19 @@ def _storage_headers(content_type: Optional[str] = None) -> dict:
     return h
 
 
+def _put_object(storage_path: str, content_type: str, data: bytes) -> None:
+    """Upload (upsert) raw bytes to the private bucket. Raises CvError on failure."""
+    url = f"{_storage_base()}/{settings.supabase_cv_bucket}/{storage_path}"
+    try:
+        with httpx.Client(timeout=30) as client:
+            r = client.post(url, headers={**_storage_headers(content_type), "x-upsert": "true"},
+                            content=data)
+    except httpx.HTTPError as e:
+        raise CvError(f"storage_unreachable: {e}", status=502)
+    if r.status_code >= 400:
+        raise CvError(f"storage_rejected: {r.status_code} {r.text}", status=502)
+
+
 def _clean_url(value: Optional[str]) -> Optional[str]:
     """Normalise an optional link field: trim, empty -> None, require http(s)."""
     if not value:
@@ -97,19 +111,7 @@ def save_cv(db: Session, user_id: str, filename: str, data: bytes) -> dict:
     # Deterministic path per user so a re-upload overwrites the previous CV
     # (x-upsert) instead of leaving orphans. One CV per candidate.
     storage_path = f"{user_id}/cv{ext}"
-    url = f"{_storage_base()}/{settings.supabase_cv_bucket}/{storage_path}"
-
-    try:
-        with httpx.Client(timeout=30) as client:
-            r = client.post(
-                url,
-                headers={**_storage_headers(ALLOWED_EXT[ext]), "x-upsert": "true"},
-                content=data,
-            )
-    except httpx.HTTPError as e:
-        raise CvError(f"storage_unreachable: {e}", status=502)
-    if r.status_code >= 400:
-        raise CvError(f"storage_rejected: {r.status_code} {r.text}", status=502)
+    _put_object(storage_path, ALLOWED_EXT[ext], data)
 
     db.execute(
         text(
@@ -131,6 +133,87 @@ def save_cv(db: Session, user_id: str, filename: str, data: bytes) -> dict:
     )
     db.commit()
     return {"storage_path": storage_path, "filename": filename}
+
+
+def save_linkedin_pdf(db: Session, user_id: str, filename: str, data: bytes) -> dict:
+    """Store the user's LinkedIn 'Save to PDF' export (parsed like a CV).
+
+    LinkedIn only exports the profile as PDF, so we accept PDF only. Stored as a
+    second document at {user_id}/linkedin.pdf; its text feeds the CV-fit read.
+    """
+    if not is_configured():
+        raise CvError("cv_storage_not_configured", status=503)
+    if _ext_of(filename) != ".pdf":
+        raise CvError("linkedin_must_be_pdf")
+    if not data:
+        raise CvError("empty_file")
+    if len(data) > MAX_BYTES:
+        raise CvError("file_too_large", status=413)
+
+    storage_path = f"{user_id}/linkedin.pdf"
+    _put_object(storage_path, "application/pdf", data)
+
+    try:
+        with db.begin_nested():
+            db.execute(
+                text(
+                    """
+                    insert into profiles (user_id, linkedin_pdf_path, linkedin_pdf_filename,
+                                          linkedin_pdf_uploaded_at)
+                    values (:u, :p, :f, now())
+                    on conflict (user_id) do update set
+                        linkedin_pdf_path        = excluded.linkedin_pdf_path,
+                        linkedin_pdf_filename    = excluded.linkedin_pdf_filename,
+                        linkedin_pdf_uploaded_at = excluded.linkedin_pdf_uploaded_at,
+                        updated_at               = now()
+                    """
+                ),
+                {"u": user_id, "p": storage_path, "f": filename},
+            )
+    except SQLAlchemyError:
+        # columns absent -> migration 006 not run yet
+        raise CvError("linkedin_not_enabled", status=503)
+
+    db.execute(
+        text("insert into events (user_id, kind, payload) values (:u, 'linkedin_pdf_uploaded', :p)"),
+        {"u": user_id, "p": json.dumps({"filename": filename, "bytes": len(data)})},
+    )
+    db.commit()
+    return {"storage_path": storage_path, "filename": filename}
+
+
+def linkedin_status(db: Session, user_id: str) -> dict:
+    """LinkedIn-PDF status, safe before migration 006 (returns has=False)."""
+    try:
+        row = db.execute(
+            text("select linkedin_pdf_path, linkedin_pdf_filename, linkedin_pdf_uploaded_at "
+                 "from profiles where user_id = :u"),
+            {"u": user_id},
+        ).mappings().first()
+    except SQLAlchemyError:
+        db.rollback()
+        return {"has_linkedin_pdf": False}
+    if not row or not row["linkedin_pdf_path"]:
+        return {"has_linkedin_pdf": False}
+    return {
+        "has_linkedin_pdf": True,
+        "linkedin_filename": row["linkedin_pdf_filename"],
+        "linkedin_uploaded_at": row["linkedin_pdf_uploaded_at"].isoformat()
+            if row["linkedin_pdf_uploaded_at"] else None,
+        "linkedin_download_url": signed_url(row["linkedin_pdf_path"]),
+    }
+
+
+def _linkedin_path(db: Session, user_id: str) -> Optional[str]:
+    try:
+        row = db.execute(
+            text("select linkedin_pdf_path from profiles where user_id = :u"),
+            {"u": user_id},
+        ).mappings().first()
+    except SQLAlchemyError:
+        db.rollback()
+        return None
+    return row["linkedin_pdf_path"] if row else None
 
 
 def save_links(
@@ -192,11 +275,12 @@ CV_FIT_SCHEMA = {
 }
 
 _FIT_SYSTEM = (
-    "You are an EPSO preparation coach. You are given a candidate's CV text and the "
-    "competition they target (with the tests it uses). Assess fit honestly and "
-    "concretely. Rules: base everything strictly on the CV text given; never invent "
-    "experience; if the CV text is thin or unreadable, set specialist_fit='unclear' "
-    "and say so; CV-fit is a strategy modifier, not a score; be brief and EPSO-specific."
+    "You are an EPSO preparation coach. You are given a candidate's CV and/or "
+    "LinkedIn profile text and the competition they target (with the tests it uses). "
+    "Assess fit honestly and concretely. Rules: base everything strictly on the text "
+    "given; never invent experience; if the text is thin or unreadable, set "
+    "specialist_fit='unclear' and say so; CV-fit is a strategy modifier, not a score; "
+    "be brief and EPSO-specific."
 )
 
 
@@ -236,19 +320,24 @@ def download_cv_bytes(storage_path: str) -> Optional[bytes]:
     return r.content if r.status_code < 400 else None
 
 
-def _fit_user_msg(cv_text: str, competition: dict) -> str:
-    # Bound tokens: a CV rarely needs more than a few thousand chars for a fit read.
+def _fit_user_msg(cv_text: str, linkedin_text: str, competition: dict) -> str:
+    # Bound tokens: a profile rarely needs more than a few thousand chars per source.
     from backend.logic import catalog as cat
-    return (
-        "Candidate CV (text):\n" + cv_text[:6000]
-        + "\n\nTarget competition:\n"
+    parts = []
+    if cv_text:
+        parts.append("Candidate CV (text):\n" + cv_text[:6000])
+    if linkedin_text:
+        parts.append("Candidate LinkedIn profile (text):\n" + linkedin_text[:6000])
+    parts.append(
+        "Target competition:\n"
         + json.dumps({
             "title": competition.get("title"),
             "grade": competition.get("grade"),
             "tests": cat.labels_for(competition.get("tests") or []),
         }, default=str)
-        + "\n\nProduce the CV-fit read."
     )
+    parts.append("Produce the CV-fit read.")
+    return "\n\n".join(parts)
 
 
 def analyze_fit(db: Session, user_id: str) -> dict:
@@ -264,23 +353,32 @@ def analyze_fit(db: Session, user_id: str) -> dict:
              "target_competition_ref from profiles where user_id = :u"),
         {"u": user_id},
     ).mappings().first()
-    if not row or not row["cv_storage_path"]:
-        raise CvError("no_cv", status=400)
+    li_path = _linkedin_path(db, user_id)
+    if (not row or not row["cv_storage_path"]) and not li_path:
+        raise CvError("no_documents", status=400)
 
-    data = download_cv_bytes(row["cv_storage_path"])
-    if not data:
-        raise CvError("cv_download_failed", status=502)
-    cv_text = extract_text(row["cv_filename"] or "cv", data)
-    if len(cv_text) < 50:
-        raise CvError("cv_text_unreadable", status=422)
+    cv_text = ""
+    if row and row["cv_storage_path"]:
+        data = download_cv_bytes(row["cv_storage_path"])
+        if data:
+            cv_text = extract_text(row["cv_filename"] or "cv", data)
+
+    li_text = ""
+    if li_path:
+        li_data = download_cv_bytes(li_path)
+        if li_data:
+            li_text = extract_text("linkedin.pdf", li_data)
+
+    if len(cv_text) + len(li_text) < 50:
+        raise CvError("text_unreadable", status=422)
 
     competition = cat.resolve_for_profile(db, {
-        "target_competition": row["target_competition"],
-        "target_competition_ref": row["target_competition_ref"],
+        "target_competition": row["target_competition"] if row else None,
+        "target_competition_ref": row["target_competition_ref"] if row else None,
     })
     fit = ai.generate_json(
         schema=CV_FIT_SCHEMA, system=_FIT_SYSTEM,
-        user=_fit_user_msg(cv_text, competition), tool_name="cv_fit", max_tokens=900,
+        user=_fit_user_msg(cv_text, li_text, competition), tool_name="cv_fit", max_tokens=900,
     )
     db.execute(
         text("update profiles set cv_fit_modifier = cast(:f as jsonb), updated_at = now() "
@@ -354,4 +452,5 @@ def get_status(db: Session, user_id: str) -> dict:
         "other_links": other or [],
         "cv_fit": cached_fit(db, user_id),
         "configured": is_configured(),
+        **linkedin_status(db, user_id),
     }

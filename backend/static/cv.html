@@ -53,6 +53,11 @@
     .err { color: #c03; font-size: 13px; }
     .ok  { color: #137a3b; font-size: 13px; }
     .skip { color: var(--muted); font-size: 14px; }
+    .howto { background: #f0f5ff; border: 1px solid #d4e0fb; border-radius: 8px; padding: 12px 14px; margin: 8px 0 14px; font-size: 13px; }
+    .howto summary { cursor: pointer; font-weight: 600; }
+    .howto ol { margin: 10px 0 6px; padding-left: 20px; }
+    .howto li { margin-bottom: 5px; }
+    .howto .note { color: var(--muted); margin: 8px 0 0; }
   </style>
 </head>
 <body>
@@ -99,6 +104,30 @@
       </div>
     </form>
 
+    <section class="card" id="linkedin-card">
+      <h3>LinkedIn profile <span class="help" style="display:inline;">(optional)</span></h3>
+      <p class="help">We read your LinkedIn like a second CV to sharpen your plan. We can't pull it from a link (LinkedIn blocks that), so you export it yourself — it takes about three clicks.</p>
+      <div id="linkedin-current" class="current" style="display:none;"></div>
+      <details class="howto" open>
+        <summary>How to get your LinkedIn PDF</summary>
+        <ol>
+          <li>Open LinkedIn <strong>on a computer</strong> and go to <strong>your profile</strong>.</li>
+          <li>Click the <strong>More</strong> button (just under your name).</li>
+          <li>Choose <strong>Save to PDF</strong> — your profile downloads as a PDF.</li>
+          <li>Upload that PDF here. 👇</li>
+        </ol>
+        <p class="note">📱 On the LinkedIn mobile app this option isn't available — do it from a computer.</p>
+      </details>
+      <label>
+        <span class="lab">Your LinkedIn PDF</span>
+        <input type="file" id="linkedin-file" accept="application/pdf,.pdf" />
+      </label>
+      <div class="actions">
+        <button class="btn btn-primary" id="linkedin-btn" type="button">Upload LinkedIn PDF</button>
+        <span id="linkedin-status"></span>
+      </div>
+    </section>
+
     <section class="card" id="fit-card" style="display:none">
       <h3>CV fit for your competition</h3>
       <p class="help">A one-time AI read of how your background fits the tests your target competition uses. Informs your plan — it doesn't change your measured scores.</p>
@@ -134,10 +163,50 @@
         var when = d.uploaded_at ? ' · uploaded ' + fmtDate(d.uploaded_at) : '';
         var link = d.download_url ? ' — <a href="' + d.download_url + '" target="_blank" rel="noopener">view</a>' : '';
         cur.innerHTML = '✓ On file: <strong>' + name + '</strong>' + when + link;
+      }
+      if (d.has_linkedin_pdf) renderLinkedin(d);
+      if (d.has_cv || d.has_linkedin_pdf) {
         document.getElementById('fit-card').style.display = 'block';
         if (d.cv_fit) renderFit(d.cv_fit);
       }
     })();
+
+    function renderLinkedin(d) {
+      var cur = document.getElementById('linkedin-current');
+      cur.style.display = 'block';
+      var name = d.linkedin_filename || 'LinkedIn profile';
+      var when = d.linkedin_uploaded_at ? ' · uploaded ' + fmtDate(d.linkedin_uploaded_at) : '';
+      var link = d.linkedin_download_url ? ' — <a href="' + d.linkedin_download_url + '" target="_blank" rel="noopener">view</a>' : '';
+      cur.innerHTML = '✓ On file: <strong>' + name + '</strong>' + when + link;
+    }
+
+    document.getElementById('linkedin-btn').addEventListener('click', async function () {
+      var ls = document.getElementById('linkedin-status');
+      var lb = document.getElementById('linkedin-btn');
+      var f = document.getElementById('linkedin-file').files[0];
+      ls.className = ''; ls.textContent = '';
+      if (!f) { ls.className = 'err'; ls.textContent = 'Choose your LinkedIn PDF first.'; return; }
+      lb.disabled = true; lb.textContent = 'Uploading…';
+      var fd = new FormData(); fd.append('file', f);
+      try {
+        var r = await fetch('/api/cv/linkedin', { method: 'POST', body: fd });
+        if (r.status === 401) { window.location.replace('/'); return; }
+        if (!r.ok) {
+          var detail = '';
+          try { detail = (await r.json()).detail; } catch (e) { detail = await r.text(); }
+          if (detail === 'linkedin_must_be_pdf') detail = 'Please upload the PDF you saved from LinkedIn.';
+          if (detail === 'linkedin_not_enabled') detail = 'LinkedIn upload isn\'t enabled on the server yet.';
+          throw new Error(detail || 'failed');
+        }
+        var data = await r.json();
+        renderLinkedin({ has_linkedin_pdf: true, linkedin_filename: data.linkedin.filename });
+        document.getElementById('fit-card').style.display = 'block';
+        ls.className = 'ok'; ls.textContent = 'Saved.';
+      } catch (e) {
+        ls.className = 'err'; ls.textContent = 'Could not upload: ' + e.message;
+      }
+      lb.disabled = false; lb.textContent = 'Upload LinkedIn PDF';
+    });
 
     var FIT_COLOR = { strong: '#137a3b', moderate: '#1e63d6', weak: '#c47b00', unclear: '#5a6b8a',
                       on_track: '#137a3b', tight: '#c47b00', at_risk: '#c03' };

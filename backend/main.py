@@ -192,6 +192,23 @@ def post_cv(
     return {"ok": True, **result}
 
 
+@app.post("/api/cv/linkedin")
+def post_cv_linkedin(
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Upload the user's LinkedIn 'Save to PDF' export (parsed like a CV)."""
+    try:
+        data = file.file.read()
+        return {"ok": True, "linkedin": cv.save_linkedin_pdf(
+            db, user["user_id"], file.filename or "linkedin.pdf", data)}
+    except cv.CvError as e:
+        raise HTTPException(status_code=e.status, detail=e.code)
+    finally:
+        file.file.close()
+
+
 @app.post("/api/cv/fit")
 def post_cv_fit(
     user: dict = Depends(get_current_user),
