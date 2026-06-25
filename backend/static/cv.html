@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Concourse — your CV</title>
+  <style>
+    :root {
+      --ink: #0f1d3a; --muted: #5a6b8a; --accent: #1e63d6;
+      --bg: #f7f9fc; --card: #fff; --border: #e5e9f2;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      color: var(--ink); background: var(--bg); line-height: 1.5;
+    }
+    .nav {
+      max-width: 720px; margin: 0 auto; padding: 22px 24px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .brand { font-weight: 700; font-size: 18px; }
+    .nav a { color: var(--muted); font-size: 13px; text-decoration: none; }
+    .wrap { max-width: 640px; margin: 30px auto 80px; padding: 0 24px; }
+    h1 { font-size: 28px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -0.01em; }
+    .lede { color: var(--muted); margin: 0 0 28px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 22px; margin-bottom: 16px;
+    }
+    .card h3 { margin: 0 0 4px; font-size: 16px; }
+    .card .help { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+    label { display: block; margin-bottom: 14px; font-size: 14px; }
+    label .lab { display: block; font-weight: 600; margin-bottom: 4px; }
+    input[type="text"], input[type="url"] {
+      width: 100%; padding: 9px 10px; border: 1px solid var(--border);
+      border-radius: 6px; font: inherit; color: inherit; background: white;
+    }
+    input[type="file"] { font: inherit; font-size: 13px; }
+    .current {
+      background: #f0fff5; border: 1px solid #bde9cd; border-radius: 8px;
+      padding: 12px 14px; font-size: 13px; margin-bottom: 14px;
+    }
+    .current a { color: var(--accent); }
+    .actions { display: flex; gap: 12px; align-items: center; margin-top: 20px; }
+    .btn {
+      padding: 11px 22px; border-radius: 8px; border: 1px solid transparent;
+      font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #174fa8; }
+    .btn-primary:disabled { background: #aab; cursor: not-allowed; }
+    .err { color: #c03; font-size: 13px; }
+    .ok  { color: #137a3b; font-size: 13px; }
+    .skip { color: var(--muted); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="brand">Concourse</div>
+    <a href="/me">← Dashboard</a>
+  </nav>
+
+  <main class="wrap">
+    <h1>Add your CV</h1>
+    <p class="lede">
+      Your CV sharpens the plan — we read it once to weight your starting point and
+      flag specialist fit. Required for specialist competitions, optional otherwise.
+      LinkedIn and a portfolio/site are optional but help.
+    </p>
+
+    <form id="cv-form">
+      <section class="card">
+        <h3>CV</h3>
+        <p class="help">PDF, DOC or DOCX, up to 10&nbsp;MB. A new upload replaces the previous one.</p>
+        <div id="current" class="current" style="display:none;"></div>
+        <label>
+          <span class="lab">Choose file</span>
+          <input type="file" name="file" id="file" accept=".pdf,.doc,.docx" />
+        </label>
+      </section>
+
+      <section class="card">
+        <h3>Links <span class="help" style="display:inline;">(optional)</span></h3>
+        <label>
+          <span class="lab">LinkedIn</span>
+          <input type="url" name="linkedin_url" id="linkedin_url" placeholder="https://linkedin.com/in/…" />
+        </label>
+        <label>
+          <span class="lab">Portfolio / personal site</span>
+          <input type="url" name="portfolio_url" id="portfolio_url" placeholder="https://…" />
+        </label>
+      </section>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="submit-btn" type="submit">Save</button>
+        <a class="skip" href="/me">Skip for now</a>
+        <span id="status"></span>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    var form   = document.getElementById('cv-form');
+    var status = document.getElementById('status');
+    var btn    = document.getElementById('submit-btn');
+
+    function fmtDate(s) { try { return new Date(s).toLocaleDateString(); } catch (e) { return s; } }
+
+    (async function load() {
+      var r = await fetch('/api/cv');
+      if (r.status === 401) { window.location.replace('/'); return; }
+      var d = await r.json();
+      if (!d.configured) {
+        status.className = 'err';
+        status.textContent = 'CV storage is not configured on the server yet.';
+      }
+      if (d.linkedin_url)  document.getElementById('linkedin_url').value  = d.linkedin_url;
+      if (d.portfolio_url) document.getElementById('portfolio_url').value = d.portfolio_url;
+      if (d.has_cv) {
+        var cur = document.getElementById('current');
+        cur.style.display = 'block';
+        var name = d.filename || 'your CV';
+        var when = d.uploaded_at ? ' · uploaded ' + fmtDate(d.uploaded_at) : '';
+        var link = d.download_url ? ' — <a href="' + d.download_url + '" target="_blank" rel="noopener">view</a>' : '';
+        cur.innerHTML = '✓ On file: <strong>' + name + '</strong>' + when + link;
+      }
+    })();
+
+    form.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      status.className = '';
+      status.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+
+      var fd = new FormData();
+      var f = document.getElementById('file').files[0];
+      if (f) fd.append('file', f);
+      var li = document.getElementById('linkedin_url').value.trim();
+      var pf = document.getElementById('portfolio_url').value.trim();
+      if (li) fd.append('linkedin_url', li);
+      if (pf) fd.append('portfolio_url', pf);
+
+      try {
+        var r = await fetch('/api/cv', { method: 'POST', body: fd });
+        if (r.status === 401) { window.location.replace('/'); return; }
+        if (!r.ok) {
+          var detail = '';
+          try { detail = (await r.json()).detail; } catch (e) { detail = await r.text(); }
+          throw new Error(detail || 'failed');
+        }
+        status.className = 'ok';
+        status.textContent = 'Saved.';
+        setTimeout(function () { window.location.replace('/me'); }, 600);
+      } catch (e) {
+        status.className = 'err';
+        status.textContent = 'Could not save: ' + e.message;
+        btn.disabled = false;
+        btn.textContent = 'Save';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 # Concourse — Roadmap
 
 > **Shared, trackable plan.** Tick boxes as work lands. Keep this file honest — it is the single source of truth for "what's done / what's next."
-> **Last updated:** 2026-06-23
+> **Last updated:** 2026-06-25 (planning call re-prioritised toward the foundation flow — see §4.6)
 > **Target launch:** first half of September 2026 (~12 weeks from the 2026-06-18 plan).
 > **Sources:** `CONTEXT.md`, `EPSO-Planner-MVP-Build-Plan.md`, `HANDOFF.md`, `OVERVIEW.md`, `COGNITIVE_DIMENSIONS.md`, `COMPASS_ROADMAP.md`. This roadmap does not invent scope beyond those.
 
@@ -127,6 +127,8 @@ See `COMPASS_ROADMAP.md` for the full 6-commit build plan (phasing, risks, calen
 
 If any week slips: M1+M2 alone (Compass v0.5) is independently sellable. The moat (M3) is the upside, not the floor.
 
+**Re-prioritised 2026-06-25:** the planning call put Compass *behind* the end-to-end foundation flow (§4.6). Compass's practice loop survives as the "reasoning-pattern exercises" half of that flow; M2–M3 continue once the foundation is demoable.
+
 ### Cost framing (2026-06-22)
 - **Dev runs on Haiku 4.5** (`$1.00/$5.00 per MTok`, 5× cheaper than Opus 4.8). Set `ANTHROPIC_MODEL=claude-haiku-4-5` in dev `.env`.
 - **Production starts on Haiku too** — escalate to Sonnet 4.6 (`$3/$15`) only if item-generation quality is unacceptable; reserve Opus 4.8 for tasks that genuinely need it.
@@ -134,6 +136,58 @@ If any week slips: M1+M2 alone (Compass v0.5) is independently sellable. The moa
 - **Per-user daily generation cap** (commit 2, env-configurable) prevents runaway loops.
 - **Pattern-analysis caching** (commit 5) uses `cache_control: {type: "ephemeral"}` — cached prompt reads cost ~10% of base rate.
 - **Anthropic billing alert** set at $20/month at console.anthropic.com to catch surprises early.
+
+---
+
+## 4.6. Planning call 2026-06-25 — foundation-flow re-prioritisation 🟡 IN FLIGHT
+
+The team worked off `Concourse-Build-Stack-Rank_2026-06-23.docx` and agreed to lead
+with the **end-to-end foundation flow** before extending Compass:
+
+**Competition Catalog → CV upload → ~5 intake questions → gap analysis → Master Plan
+(free preview) → 🔒 paywall → "Let's Study Now" daily plan + exercises.**
+
+Much of the spine already exists (intake, scoring/gap, master plan, daily plan — §4 &
+§5). The genuinely new pieces and decisions:
+
+- [~] **Competition Catalog Table** (NEW top priority) — auto-import EPSO *bandi* data
+  (ref, grade, profile, deadline, selection-procedure tests, link to the official
+  Notice) for open / in-progress / upcoming competitions; feeds gap analysis + Draft
+  plan. **Scraper built 2026-06-25** (`tools/epso_benchmark/catalog_scrape.py`, reuses
+  the existing polite Crawler+Robots) — validated live: 7 in-progress competitions
+  parsed, AD5-vs-AD7 test mixes differentiated, 7/7 with reference + Notice link;
+  `upcoming` (plain-text announcements) still best-effort. **Remaining:** a
+  `competitions` table + loader so the app reads it; wire the candidate's chosen
+  competition's tests into the Draft plan. *Owner: Leonardo (was Giovanni in the
+  minute — Leonardo took the scraper; coordinate with Giovanni so it isn't rebuilt).*
+- [~] **CV upload** — Supabase Storage (private `cvs` bucket) + optional LinkedIn /
+  portfolio links; mandatory for specialist competitions, optional otherwise. *Owner:
+  Leonardo.* **Scaffolded 2026-06-25:** `backend/logic/cv.py`, `POST/GET /api/cv`,
+  `/cv` page, `me.html` CTA, migration `004_cv_profile_links.sql` (schema already had
+  `cv_storage_path`). **Remaining:** run migration 004 (coordinate on Slack), create
+  the `cvs` bucket, set `SUPABASE_SERVICE_ROLE_KEY`, add `python-multipart` to the
+  deployed env, then the LLM CV-fit read that writes `profiles.cv_fit_modifier`.
+- [ ] **Paywall at the Master Plan** — free preview of the plan for everyone; subscribe
+  for full plan / advanced study sessions. Moves payments *earlier* than §5 Session 9
+  (which deferred Stripe behind Compass v1). `users` already carries the Stripe columns.
+- [ ] **Master Plan as the trust moment** — show it immediately after gap analysis;
+  possible rename **Master Plan → "draft plan"**; copy must say it evolves with real
+  performance.
+- [ ] **~5 intake questions** grounded in the chosen *bando* + CV (refine existing
+  intake), balancing direct self-assessment vs pure AI inference.
+- [ ] **Exercises: theory vs reasoning-pattern split** — AI-generated theory **plus**
+  reasoning-pattern items (numerical/verbal/abstract) that test exam *archetypes*, not a
+  full mock. Users can input results (incl. **screenshots**) to refine the internal
+  score → this **revives "Layer B"**, previously marked Dropped (§3, Layer B row).
+- [ ] **Exercise DB sourcing** — direct scraping of test sites is blocked (Cloudflare /
+  `ai-train=no`); buy reliable digital materials or extract from training materials +
+  GPT chats; legal prudence + scalability prioritised. *Owner: Stefano.*
+- [ ] **AI prompts grounded in test-taking literature**, with weakness analysis driving
+  session personalisation.
+
+**Owners & near-term:** Leonardo → foundation layer + Master Plan flow demoable **by Sun
+2026-06-28** (+ CV upload); Stefano → exercise sources; Giovanni → catalog script + UI
+polish next week. GDPR note: CVs are personal data — reinforces the erasure/DPA items in §6.
 
 ---
 

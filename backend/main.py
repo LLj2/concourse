@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Body
+from fastapi import FastAPI, Depends, HTTPException, Body, UploadFile, File, Form
 from fastapi.responses import FileResponse, RedirectResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -15,6 +15,7 @@ from backend.logic import diagnostic as dx
 from backend.logic import scoring as sc
 from backend.logic import planning as pl
 from backend.logic import adherence as ad
+from backend.logic import cv as cv
 from backend.ai import client as ai
 
 app = FastAPI(title="Concourse", version="0.1.0")
@@ -84,6 +85,11 @@ def plan_page(user: dict = Depends(get_current_user)):
     return FileResponse(STATIC_DIR / "plan.html")
 
 
+@app.get("/cv")
+def cv_page(user: dict = Depends(get_current_user)):
+    return FileResponse(STATIC_DIR / "cv.html")
+
+
 # ---------- intake API ----------
 
 @app.post("/api/intake")
@@ -142,6 +148,44 @@ def submit_intake(
     )
     db.commit()
     return {"ok": True}
+
+
+# ---------- CV + profile links API (foundation flow) ----------
+
+@app.get("/api/cv")
+def get_cv(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Current CV + links for this user (with a short-lived download URL)."""
+    return cv.get_status(db, user["user_id"])
+
+
+@app.post("/api/cv")
+def post_cv(
+    file: Optional[UploadFile] = File(default=None),
+    linkedin_url: Optional[str] = Form(default=None),
+    portfolio_url: Optional[str] = Form(default=None),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Upload a CV and/or save profile links. Both parts are optional so the
+    user can add links now and the CV later — but at least one must be present."""
+    if file is None and not (linkedin_url or portfolio_url):
+        raise HTTPException(status_code=400, detail="nothing_to_save")
+
+    result: dict = {}
+    if file is not None:
+        try:
+            data = file.file.read()
+            result["cv"] = cv.save_cv(db, user["user_id"], file.filename or "cv", data)
+        except cv.CvError as e:
+            raise HTTPException(status_code=e.status, detail=e.code)
+        finally:
+            file.file.close()
+
+    result["links"] = cv.save_links(db, user["user_id"], linkedin_url, portfolio_url)
+    return {"ok": True, **result}
 
 
 @app.get("/api/me")
