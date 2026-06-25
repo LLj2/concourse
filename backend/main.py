@@ -143,6 +143,9 @@ def submit_intake(
             "eu": payload.get("self_eu_breadth_score"),
         },
     )
+    # Optionally link the candidate to a specific catalog competition (slug/ref).
+    # Safe no-op if migration 005 hasn't added the column yet.
+    cat.set_target_ref(db, user["user_id"], payload.get("target_competition_ref"))
     db.execute(
         text("insert into events (user_id, kind, payload) values (:u, 'intake_completed', :p)"),
         {"u": user["user_id"], "p": json.dumps({"weeks_to_exam": payload.get("weeks_to_exam")})},

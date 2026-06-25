@@ -81,6 +81,7 @@ def _row_to_competition(row) -> dict:
         import json
         tests = json.loads(tests)
     return {
+        "slug": row.get("slug"),
         "ref": row["ref"],
         "title": row["title"],
         "grade": row["grade"],
@@ -102,7 +103,7 @@ def _safe_query(db: Session, sql: str, params: dict):
 
 def list_competitions(db: Session, status: Optional[str] = None) -> list[dict]:
     """All catalog competitions (optionally filtered by status). Empty if not loaded."""
-    sql = ("select ref, title, grade, status, deadline, tests, notice_url "
+    sql = ("select slug, ref, title, grade, status, deadline, tests, notice_url "
            "from competitions")
     params: dict = {}
     if status:
@@ -111,6 +112,27 @@ def list_competitions(db: Session, status: Optional[str] = None) -> list[dict]:
     sql += " order by (deadline is null), deadline asc, title"
     res = _safe_query(db, sql, params)
     return [_row_to_competition(r) for r in res] if res is not None else []
+
+
+def set_target_ref(db: Session, user_id: str, ref: Optional[str]) -> bool:
+    """Persist the candidate's chosen competition (slug/ref) on their profile.
+
+    Runs inside a SAVEPOINT so that if migration 005 hasn't added the column yet,
+    the failure rolls back only this statement — the surrounding intake commit is
+    unaffected. Returns True if stored, False if skipped/unavailable.
+    """
+    if not ref:
+        return False
+    try:
+        with db.begin_nested():
+            db.execute(
+                text("update profiles set target_competition_ref = :r, "
+                     "updated_at = now() where user_id = :u"),
+                {"r": ref, "u": user_id},
+            )
+        return True
+    except SQLAlchemyError:
+        return False  # column not there yet (pre-migration) — ignore, keep intake working
 
 
 def profile_target_ref(db: Session, user_id: str) -> Optional[str]:
@@ -136,7 +158,7 @@ def resolve_for_profile(db: Session, constraints: dict) -> dict:
         # reference (which can match several multi-field rows) — take the first.
         res = _safe_query(
             db,
-            "select ref, title, grade, status, deadline, tests, notice_url "
+            "select slug, ref, title, grade, status, deadline, tests, notice_url "
             "from competitions where slug = :r or ref = :r "
             "order by (slug = :r) desc limit 1",
             {"r": ref},

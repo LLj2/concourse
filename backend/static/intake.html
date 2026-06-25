@@ -114,6 +114,12 @@
             <option value="other">Other / not sure yet</option>
           </select>
         </label>
+        <label id="comp-picker" class="hidden">
+          <span class="lab">Specific competition (optional — tailors your plan to its exact tests)</span>
+          <select name="target_competition_ref">
+            <option value="">— use my selection above —</option>
+          </select>
+        </label>
         <div class="inline">
           <label>
             <span class="lab">Weeks to exam</span>
@@ -210,6 +216,28 @@
     var status = document.getElementById('status');
     var btn = document.getElementById('submit-btn');
 
+    // Populate the optional "specific competition" picker from the catalog.
+    // Hidden (and harmless) until the catalog is loaded into the DB.
+    (async function loadCompetitions() {
+      try {
+        var r = await fetch('/api/competitions');
+        if (!r.ok) return;
+        var comps = ((await r.json()).competitions || []).filter(function (c) { return c.title && (c.slug || c.ref); });
+        if (!comps.length) return;
+        var sel = document.querySelector('select[name="target_competition_ref"]');
+        comps.forEach(function (c) {
+          var o = document.createElement('option');
+          o.value = c.slug || c.ref;
+          var bits = [c.title];
+          if (c.grade) bits.push('(' + c.grade + ')');
+          if (c.status) bits.push('· ' + c.status);
+          o.textContent = bits.join(' ');
+          sel.appendChild(o);
+        });
+        document.getElementById('comp-picker').classList.remove('hidden');
+      } catch (e) { /* catalog not loaded yet — keep the generic dropdown only */ }
+    })();
+
     form.addEventListener('submit', async function (ev) {
       ev.preventDefault();
       status.className = 'err';
@@ -232,6 +260,7 @@
       };
       delete data.energy_morning; delete data.energy_afternoon; delete data.energy_evening;
       if (!data.last_epso_test_at) delete data.last_epso_test_at;
+      if (!data.target_competition_ref) delete data.target_competition_ref;
 
       try {
         var r = await fetch('/api/intake', {
