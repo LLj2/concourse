@@ -172,9 +172,10 @@ Much of the spine already exists (intake, scoring/gap, master plan, daily plan �
   Leonardo.* **Scaffolded 2026-06-25:** `backend/logic/cv.py`, `POST/GET /api/cv`,
   `/cv` page, `me.html` CTA, migration `004_cv_profile_links.sql` (schema already had
   `cv_storage_path`). **Remaining:** run migration 004 (coordinate on Slack), create
-  the `cvs` bucket (Supabase Storage), set `SUPABASE_SERVICE_ROLE_KEY`, run
-  `scripts/migrate.py` + `pip install -r requirements.txt`, then the LLM CV-fit read
-  that writes `profiles.cv_fit_modifier`.
+  the `cvs` bucket in Supabase Storage (env `SUPABASE_SERVICE_ROLE_KEY` +
+  `SUPABASE_CV_BUCKET=cvs` are already set), run `scripts/migrate.py` +
+  `pip install -r requirements.txt`, then the LLM CV-fit read that writes
+  `profiles.cv_fit_modifier`.
 - [ ] **Paywall at the Master Plan** — free preview of the plan for everyone; subscribe
   for full plan / advanced study sessions. Moves payments *earlier* than §5 Session 9
   (which deferred Stripe behind Compass v1). `users` already carries the Stripe columns.
