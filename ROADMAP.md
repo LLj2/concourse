@@ -161,18 +161,20 @@ Much of the spine already exists (intake, scoring/gap, master plan, daily plan �
   `load_catalog.py` loader (upsert from the scraped JSON), `backend/logic/catalog.py`
   (resolve the candidate's competition + tests, with a grade-family fallback so it
   works before the table is loaded), `GET /api/competitions`, and the Draft plan now
-  states which tests the candidate will face (rationale + `/plan` banner). **Remaining:**
-  run migration 005 + `load_catalog.py` on the shared DB (coordinate on Slack); add a
-  catalog picker to intake that sets `profiles.target_competition_ref` (until then the
-  fallback test map is used). *Owner: Leonardo (was Giovanni in the minute — coordinate
-  so it isn't rebuilt).*
+  states which tests the candidate will face (rationale + `/plan` banner). Intake has an
+  optional catalog picker that sets `profiles.target_competition_ref` (falls back to a
+  grade-family test map until a competition is chosen / the catalog is loaded).
+  **Remaining:** run `scripts/migrate.py --load-catalog` once on the shared DB
+  (coordinate on Slack). *Owner: Leonardo (was Giovanni in the minute — coordinate so
+  it isn't rebuilt).*
 - [~] **CV upload** — Supabase Storage (private `cvs` bucket) + optional LinkedIn /
   portfolio links; mandatory for specialist competitions, optional otherwise. *Owner:
   Leonardo.* **Scaffolded 2026-06-25:** `backend/logic/cv.py`, `POST/GET /api/cv`,
   `/cv` page, `me.html` CTA, migration `004_cv_profile_links.sql` (schema already had
   `cv_storage_path`). **Remaining:** run migration 004 (coordinate on Slack), create
-  the `cvs` bucket, set `SUPABASE_SERVICE_ROLE_KEY`, add `python-multipart` to the
-  deployed env, then the LLM CV-fit read that writes `profiles.cv_fit_modifier`.
+  the `cvs` bucket (Supabase Storage), set `SUPABASE_SERVICE_ROLE_KEY`, run
+  `scripts/migrate.py` + `pip install -r requirements.txt`, then the LLM CV-fit read
+  that writes `profiles.cv_fit_modifier`.
 - [ ] **Paywall at the Master Plan** — free preview of the plan for everyone; subscribe
   for full plan / advanced study sessions. Moves payments *earlier* than §5 Session 9
   (which deferred Stripe behind Compass v1). `users` already carries the Stripe columns.
