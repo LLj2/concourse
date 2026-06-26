@@ -270,8 +270,15 @@
       return '<span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:' + c + '">' + text + '</span>';
     }
     function bullets(arr) {
-      if (!arr || !arr.length) return '';
+      // The schema says these are arrays, but the LLM occasionally returns a bare
+      // string — coerce so a stray string can't crash the whole fit render.
+      if (typeof arr === 'string') arr = arr.trim() ? [arr] : [];
+      if (!Array.isArray(arr) || !arr.length) return '';
       return '<ul style="margin:6px 0 0;padding-left:18px">' + arr.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
+    }
+    function section(title, arr) {
+      var b = bullets(arr);
+      return b ? '<div class="lab" style="font-weight:600;margin-top:8px">' + title + '</div>' + b : '';
     }
     function renderFit(fit) {
       var el = document.getElementById('fit-result');
@@ -279,10 +286,10 @@
         chip('Specialist fit: ' + (fit.specialist_fit || '—'), fit.specialist_fit) + ' ' +
         chip('Feasibility: ' + (fit.go_no_go || '—'), fit.go_no_go) + '</div>';
       if (fit.summary) html += '<p style="margin:0 0 8px">' + fit.summary + '</p>';
-      if (fit.relevant_strengths && fit.relevant_strengths.length) html += '<div class="lab" style="font-weight:600;margin-top:8px">Relevant strengths</div>' + bullets(fit.relevant_strengths);
-      if (fit.gaps && fit.gaps.length) html += '<div class="lab" style="font-weight:600;margin-top:8px">Gaps</div>' + bullets(fit.gaps);
+      html += section('Relevant strengths', fit.relevant_strengths);
+      html += section('Gaps', fit.gaps);
       if (fit.strategy_note) html += '<p style="margin:10px 0 0"><strong>Strategy:</strong> ' + fit.strategy_note + '</p>';
-      if (fit.alternatives && fit.alternatives.length) html += '<div class="lab" style="font-weight:600;margin-top:8px">Competitions that might fit better</div>' + bullets(fit.alternatives);
+      html += section('Competitions that might fit better', fit.alternatives);
       el.innerHTML = html;
       document.getElementById('fit-btn').textContent = 'Re-analyze';
     }
