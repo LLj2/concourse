@@ -196,9 +196,9 @@ Much of the spine already exists (intake, scoring/gap, master plan, daily plan �
 - [ ] **Paywall at the Master Plan** — free preview of the plan for everyone; subscribe
   for full plan / advanced study sessions. Moves payments *earlier* than §5 Session 9
   (which deferred Stripe behind Compass v1). `users` already carries the Stripe columns.
-- [ ] **Master Plan as the trust moment** — show it immediately after gap analysis;
-  possible rename **Master Plan → "draft plan"**; copy must say it evolves with real
-  performance.
+- [x] **Master Plan as the trust moment** — DONE 2026-06-26: intake now generates the
+  plan on submit and lands the user straight on `/plan` (no dashboard detour);
+  renamed to **"Draft plan"** with copy that says it sharpens as you practise.
 - [ ] **~5 intake questions** grounded in the chosen *bando* + CV (refine existing
   intake), balancing direct self-assessment vs pure AI inference.
 - [ ] **Exercises: theory vs reasoning-pattern split** — AI-generated theory **plus**
@@ -214,6 +214,19 @@ Much of the spine already exists (intake, scoring/gap, master plan, daily plan �
 **Owners & near-term:** Leonardo → foundation layer + Master Plan flow demoable **by Sun
 2026-06-28** (+ CV upload); Stefano → exercise sources; Giovanni → catalog script + UI
 polish next week. GDPR note: CVs are personal data — reinforces the erasure/DPA items in §6.
+
+**Live status 2026-06-26 — foundation flow deployed to prod & walked end-to-end.**
+The whole spine is live on Railway and tested by a real logged-in user:
+sign-up → intake (catalog picker) → **Draft plan generated on submit** → CV + LinkedIn-PDF
+upload → CV-fit read → Compass practice. Fixes shipped this session: dead "Sign in" nav
+link wired up; `Cache-Control: no-cache` on HTML/JS (was serving stale pages); missing
+`SUPABASE_SERVICE_ROLE_KEY` added to Railway (CV uploads were 503-ing) + `/health` now
+reports `storage_configured`; CV page reordered (CV → LinkedIn → fit) and the dead
+LinkedIn-URL field removed (Portfolio kept); CV-fit render hardened against
+string-or-array LLM output; empty Compass `/me` panels now show discovery placeholders.
+**Still to do:** review *content* + polish the flow + various product choices; custom
+SMTP (Resend) so magic-link login is reliable for non-test users (Gmail link-scanner +
+rate limit still bite); Paywall; decide whether CV-fit should influence anything concrete.
 
 ---
 
