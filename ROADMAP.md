@@ -1,7 +1,7 @@
 # Concourse — Roadmap
 
 > **Shared, trackable plan.** Tick boxes as work lands. Keep this file honest — it is the single source of truth for "what's done / what's next."
-> **Last updated:** 2026-06-25 (planning call re-prioritised toward the foundation flow — see §4.6)
+> **Last updated:** 2026-06-26 (foundation flow — Competition Catalog + CV upload — merged & deployed, §4.6; Compass v1 reconciled as live, §4.5)
 > **Target launch:** first half of September 2026 (~12 weeks from the 2026-06-18 plan).
 > **Sources:** `CONTEXT.md`, `EPSO-Planner-MVP-Build-Plan.md`, `HANDOFF.md`, `OVERVIEW.md`, `COGNITIVE_DIMENSIONS.md`, `COMPASS_ROADMAP.md`. This roadmap does not invent scope beyond those.
 
@@ -82,7 +82,7 @@ The architectural keystone (fixes Risks 1, 3, 5 at once): **the product measures
 
 ---
 
-## 4.5. Compass — flagship feature rollout 🟡 IN FLIGHT
+## 4.5. Compass — flagship feature rollout ✅ v1 LIVE (M1+M2+M3 done 2026-06-23)
 
 **Compass is the adaptive practice engine that turns Concourse from a planner into the place EPSO candidates train every day.** It is the strategic moat: every question carries cognitive-dimension metadata; every wrong answer carries a misconception tag; an LLM pass finds patterns no individual question could reveal; the next session is generated to target the user's specific weak patterns; the dimension schema itself self-corrects with real data.
 
@@ -127,7 +127,7 @@ See `COMPASS_ROADMAP.md` for the full 6-commit build plan (phasing, risks, calen
 
 If any week slips: M1+M2 alone (Compass v0.5) is independently sellable. The moat (M3) is the upside, not the floor.
 
-**Re-prioritised 2026-06-25:** the planning call put Compass *behind* the end-to-end foundation flow (§4.6). Compass's practice loop survives as the "reasoning-pattern exercises" half of that flow; M2–M3 continue once the foundation is demoable.
+**Re-prioritised 2026-06-25, reconciled 2026-06-26:** the planning call put Compass *behind* the end-to-end foundation flow (§4.6). In the event both landed in the same window — Compass M2–M3 shipped 2026-06-23 (v1 live) and the foundation flow merged 2026-06-26. Compass's practice loop is the "reasoning-pattern exercises" half of the foundation flow; daily-plan deep-linking into Compass is the remaining stitch (deferred to a small follow-up once a pilot runs — see M3 note above).
 
 ### Cost framing (2026-06-22)
 - **Dev runs on Haiku 4.5** (`$1.00/$5.00 per MTok`, 5× cheaper than Opus 4.8). Set `ANTHROPIC_MODEL=claude-haiku-4-5` in dev `.env`.
