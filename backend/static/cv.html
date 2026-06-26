@@ -33,6 +33,10 @@
     .card .help { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
     label { display: block; margin-bottom: 14px; font-size: 14px; }
     label .lab { display: block; font-weight: 600; margin-bottom: 4px; }
+    input[type="url"] {
+      width: 100%; padding: 9px 10px; border: 1px solid var(--border);
+      border-radius: 6px; font: inherit; color: inherit; background: white;
+    }
     input[type="file"] { font: inherit; font-size: 13px; }
     .current {
       background: #f0fff5; border: 1px solid #bde9cd; border-radius: 8px;
@@ -47,7 +51,6 @@
     .btn-primary { background: var(--accent); color: white; }
     .btn-primary:hover { background: #174fa8; }
     .btn-primary:disabled { background: #aab; cursor: not-allowed; }
-    .btn-ghost { background: transparent; color: var(--accent); border-color: var(--border); }
     .err { color: #c03; font-size: 13px; }
     .ok  { color: #137a3b; font-size: 13px; }
     .continue-row { display: flex; justify-content: space-between; align-items: center; margin-top: 26px; }
@@ -77,14 +80,14 @@
     <section class="card">
       <h3><span class="step">1</span>Upload your CV</h3>
       <p class="help">PDF, DOC or DOCX, up to 10&nbsp;MB. A new upload replaces the previous one.</p>
-      <div id="current" class="current" style="display:none;"></div>
+      <div id="cv-current" class="current" style="display:none;"></div>
       <label>
         <span class="lab">Choose file</span>
-        <input type="file" id="file" accept=".pdf,.doc,.docx" />
+        <input type="file" id="cv-file" accept=".pdf,.doc,.docx" />
       </label>
       <div class="actions">
         <button class="btn btn-primary" id="cv-btn" type="button">Upload CV</button>
-        <span id="status"></span>
+        <span id="cv-status"></span>
       </div>
     </section>
 
@@ -113,6 +116,20 @@
       </div>
     </section>
 
+    <!-- Optional — portfolio / personal site -->
+    <section class="card">
+      <h3>Portfolio / personal site <span class="help" style="display:inline;font-weight:400;">(optional)</span></h3>
+      <p class="help">A link to your portfolio or personal site, if you have one.</p>
+      <label>
+        <span class="lab">URL</span>
+        <input type="url" id="portfolio_url" placeholder="https://…" />
+      </label>
+      <div class="actions">
+        <button class="btn btn-primary" id="portfolio-btn" type="button">Save link</button>
+        <span id="portfolio-status"></span>
+      </div>
+    </section>
+
     <!-- Step 3 — fit (revealed once there's something to read) -->
     <section class="card" id="fit-card" style="display:none">
       <h3><span class="step">3</span>Check your fit</h3>
@@ -131,18 +148,16 @@
   </main>
 
   <script>
-    var status = document.getElementById('status');
-
     function fmtDate(s) { try { return new Date(s).toLocaleDateString(); } catch (e) { return s; } }
+    function setMsg(el, cls, text) { el.className = cls; el.textContent = text; }
 
     (async function load() {
+      var cvStatus = document.getElementById('cv-status');
       var r = await fetch('/api/cv');
       if (r.status === 401) { window.location.replace('/'); return; }
       var d = await r.json();
-      if (!d.configured) {
-        status.className = 'err';
-        status.textContent = 'CV storage is not configured on the server yet.';
-      }
+      if (!d.configured) setMsg(cvStatus, 'err', 'CV storage is not configured on the server yet.');
+      if (d.portfolio_url) document.getElementById('portfolio_url').value = d.portfolio_url;
       if (d.has_cv) renderCv(d);
       if (d.has_linkedin_pdf) renderLinkedin(d);
       if (d.has_cv || d.has_linkedin_pdf) {
@@ -152,7 +167,7 @@
     })();
 
     function renderCv(d) {
-      var cur = document.getElementById('current');
+      var cur = document.getElementById('cv-current');
       cur.style.display = 'block';
       var name = d.filename || 'your CV';
       var when = d.uploaded_at ? ' · uploaded ' + fmtDate(d.uploaded_at) : '';
@@ -161,10 +176,11 @@
     }
 
     document.getElementById('cv-btn').addEventListener('click', async function () {
+      var cvStatus = document.getElementById('cv-status');
       var cb = document.getElementById('cv-btn');
-      var f = document.getElementById('file').files[0];
-      status.className = ''; status.textContent = '';
-      if (!f) { status.className = 'err'; status.textContent = 'Choose a CV file first.'; return; }
+      var f = document.getElementById('cv-file').files[0];
+      setMsg(cvStatus, '', '');
+      if (!f) { setMsg(cvStatus, 'err', 'Choose a CV file first.'); return; }
       cb.disabled = true; cb.textContent = 'Uploading…';
       var fd = new FormData(); fd.append('file', f);
       try {
@@ -180,9 +196,9 @@
         var data = await r.json();
         renderCv({ has_cv: true, filename: data.cv.filename, uploaded_at: new Date().toISOString() });
         document.getElementById('fit-card').style.display = 'block';
-        status.className = 'ok'; status.textContent = 'Saved.';
+        setMsg(cvStatus, 'ok', 'Saved.');
       } catch (e) {
-        status.className = 'err'; status.textContent = 'Could not save: ' + e.message;
+        setMsg(cvStatus, 'err', 'Could not save: ' + e.message);
       }
       cb.disabled = false; cb.textContent = 'Upload CV';
     });
@@ -200,8 +216,8 @@
       var ls = document.getElementById('linkedin-status');
       var lb = document.getElementById('linkedin-btn');
       var f = document.getElementById('linkedin-file').files[0];
-      ls.className = ''; ls.textContent = '';
-      if (!f) { ls.className = 'err'; ls.textContent = 'Choose your LinkedIn PDF first.'; return; }
+      setMsg(ls, '', '');
+      if (!f) { setMsg(ls, 'err', 'Choose your LinkedIn PDF first.'); return; }
       lb.disabled = true; lb.textContent = 'Uploading…';
       var fd = new FormData(); fd.append('file', f);
       try {
@@ -217,11 +233,34 @@
         var data = await r.json();
         renderLinkedin({ has_linkedin_pdf: true, linkedin_filename: data.linkedin.filename });
         document.getElementById('fit-card').style.display = 'block';
-        ls.className = 'ok'; ls.textContent = 'Saved.';
+        setMsg(ls, 'ok', 'Saved.');
       } catch (e) {
-        ls.className = 'err'; ls.textContent = 'Could not upload: ' + e.message;
+        setMsg(ls, 'err', 'Could not upload: ' + e.message);
       }
       lb.disabled = false; lb.textContent = 'Upload LinkedIn PDF';
+    });
+
+    document.getElementById('portfolio-btn').addEventListener('click', async function () {
+      var ps = document.getElementById('portfolio-status');
+      var pb = document.getElementById('portfolio-btn');
+      var url = document.getElementById('portfolio_url').value.trim();
+      setMsg(ps, '', '');
+      if (!url) { setMsg(ps, 'err', 'Enter a URL first.'); return; }
+      pb.disabled = true; pb.textContent = 'Saving…';
+      var fd = new FormData(); fd.append('portfolio_url', url);
+      try {
+        var r = await fetch('/api/cv', { method: 'POST', body: fd });
+        if (r.status === 401) { window.location.replace('/'); return; }
+        if (!r.ok) {
+          var detail = '';
+          try { detail = (await r.json()).detail; } catch (e) { detail = await r.text(); }
+          throw new Error(detail || 'failed');
+        }
+        setMsg(ps, 'ok', 'Saved.');
+      } catch (e) {
+        setMsg(ps, 'err', 'Could not save: ' + e.message);
+      }
+      pb.disabled = false; pb.textContent = 'Save link';
     });
 
     var FIT_COLOR = { strong: '#137a3b', moderate: '#1e63d6', weak: '#c47b00', unclear: '#5a6b8a',
@@ -251,7 +290,7 @@
     document.getElementById('fit-btn').addEventListener('click', async function () {
       var fs = document.getElementById('fit-status');
       var fb = document.getElementById('fit-btn');
-      fs.className = ''; fs.textContent = ''; fb.disabled = true; fb.textContent = 'Analyzing…';
+      setMsg(fs, '', ''); fb.disabled = true; fb.textContent = 'Analyzing…';
       try {
         var r = await fetch('/api/cv/fit', { method: 'POST' });
         if (r.status === 401) { window.location.replace('/'); return; }
@@ -264,7 +303,7 @@
         }
         renderFit((await r.json()).cv_fit);
       } catch (e) {
-        fs.className = 'err'; fs.textContent = 'Could not analyze: ' + e.message;
+        setMsg(fs, 'err', 'Could not analyze: ' + e.message);
         fb.disabled = false; fb.textContent = 'Analyze my fit';
         return;
       }
