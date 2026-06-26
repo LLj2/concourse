@@ -270,6 +270,18 @@
         });
         if (r.status === 401) { window.location.replace('/'); return; }
         if (!r.ok) throw new Error((await r.text()) || 'failed');
+
+        // Build the Draft plan right now — this is the trust moment (ROADMAP §4.6):
+        // show the plan immediately, not a dashboard of more chores.
+        btn.textContent = 'Building your plan…';
+        try {
+          var pr = await fetch('/api/plan/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: '{}',
+          });
+          if (pr.ok) { window.location.replace('/plan'); return; }
+        } catch (e) { /* fall through to the dashboard, which can generate on demand */ }
         window.location.replace('/me');
       } catch (e) {
         status.textContent = 'Could not save: ' + e.message;

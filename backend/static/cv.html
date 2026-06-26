@@ -29,13 +29,10 @@
       border-radius: 10px; padding: 22px; margin-bottom: 16px;
     }
     .card h3 { margin: 0 0 4px; font-size: 16px; }
+    .step { color: var(--accent); font-weight: 700; margin-right: 6px; }
     .card .help { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
     label { display: block; margin-bottom: 14px; font-size: 14px; }
     label .lab { display: block; font-weight: 600; margin-bottom: 4px; }
-    input[type="text"], input[type="url"] {
-      width: 100%; padding: 9px 10px; border: 1px solid var(--border);
-      border-radius: 6px; font: inherit; color: inherit; background: white;
-    }
     input[type="file"] { font: inherit; font-size: 13px; }
     .current {
       background: #f0fff5; border: 1px solid #bde9cd; border-radius: 8px;
@@ -50,9 +47,11 @@
     .btn-primary { background: var(--accent); color: white; }
     .btn-primary:hover { background: #174fa8; }
     .btn-primary:disabled { background: #aab; cursor: not-allowed; }
+    .btn-ghost { background: transparent; color: var(--accent); border-color: var(--border); }
     .err { color: #c03; font-size: 13px; }
     .ok  { color: #137a3b; font-size: 13px; }
-    .skip { color: var(--muted); font-size: 14px; }
+    .continue-row { display: flex; justify-content: space-between; align-items: center; margin-top: 26px; }
+    .skip { color: var(--muted); font-size: 14px; text-decoration: none; }
     .howto { background: #f0f5ff; border: 1px solid #d4e0fb; border-radius: 8px; padding: 12px 14px; margin: 8px 0 14px; font-size: 13px; }
     .howto summary { cursor: pointer; font-weight: 600; }
     .howto ol { margin: 10px 0 6px; padding-left: 20px; }
@@ -67,48 +66,34 @@
   </nav>
 
   <main class="wrap">
-    <h1>Add your CV</h1>
+    <h1>Your CV</h1>
     <p class="lede">
-      Your CV sharpens the plan — we read it once to weight your starting point and
-      flag specialist fit. Required for specialist competitions, optional otherwise.
-      LinkedIn and a portfolio/site are optional but help.
+      We read your CV once to weight your starting point and flag your fit for the
+      competition you're targeting. Required for specialist competitions, optional
+      otherwise. Adding your LinkedIn profile (as a PDF) sharpens the read.
     </p>
 
-    <form id="cv-form">
-      <section class="card">
-        <h3>CV</h3>
-        <p class="help">PDF, DOC or DOCX, up to 10&nbsp;MB. A new upload replaces the previous one.</p>
-        <div id="current" class="current" style="display:none;"></div>
-        <label>
-          <span class="lab">Choose file</span>
-          <input type="file" name="file" id="file" accept=".pdf,.doc,.docx" />
-        </label>
-      </section>
-
-      <section class="card">
-        <h3>Links <span class="help" style="display:inline;">(optional)</span></h3>
-        <label>
-          <span class="lab">LinkedIn</span>
-          <input type="url" name="linkedin_url" id="linkedin_url" placeholder="https://linkedin.com/in/…" />
-        </label>
-        <label>
-          <span class="lab">Portfolio / personal site</span>
-          <input type="url" name="portfolio_url" id="portfolio_url" placeholder="https://…" />
-        </label>
-      </section>
-
+    <!-- Step 1 — CV file -->
+    <section class="card">
+      <h3><span class="step">1</span>Upload your CV</h3>
+      <p class="help">PDF, DOC or DOCX, up to 10&nbsp;MB. A new upload replaces the previous one.</p>
+      <div id="current" class="current" style="display:none;"></div>
+      <label>
+        <span class="lab">Choose file</span>
+        <input type="file" id="file" accept=".pdf,.doc,.docx" />
+      </label>
       <div class="actions">
-        <button class="btn btn-primary" id="submit-btn" type="submit">Save</button>
-        <a class="skip" href="/me">Skip for now</a>
+        <button class="btn btn-primary" id="cv-btn" type="button">Upload CV</button>
         <span id="status"></span>
       </div>
-    </form>
+    </section>
 
+    <!-- Step 2 — LinkedIn PDF -->
     <section class="card" id="linkedin-card">
-      <h3>LinkedIn profile <span class="help" style="display:inline;">(optional)</span></h3>
-      <p class="help">We read your LinkedIn like a second CV to sharpen your plan. We can't pull it from a link (LinkedIn blocks that), so you export it yourself — it takes about three clicks.</p>
+      <h3><span class="step">2</span>Add your LinkedIn profile <span class="help" style="display:inline;font-weight:400;">(optional)</span></h3>
+      <p class="help">We read your LinkedIn like a second CV. We can't pull it from a link (LinkedIn blocks that), so you export it yourself — about three clicks.</p>
       <div id="linkedin-current" class="current" style="display:none;"></div>
-      <details class="howto" open>
+      <details class="howto">
         <summary>How to get your LinkedIn PDF</summary>
         <ol>
           <li>Open LinkedIn <strong>on a computer</strong> and go to <strong>your profile</strong>.</li>
@@ -128,8 +113,9 @@
       </div>
     </section>
 
+    <!-- Step 3 — fit (revealed once there's something to read) -->
     <section class="card" id="fit-card" style="display:none">
-      <h3>CV fit for your competition</h3>
+      <h3><span class="step">3</span>Check your fit</h3>
       <p class="help">A one-time AI read of how your background fits the tests your target competition uses. Informs your plan — it doesn't change your measured scores.</p>
       <div id="fit-result"></div>
       <div class="actions">
@@ -137,12 +123,15 @@
         <span id="fit-status"></span>
       </div>
     </section>
+
+    <div class="continue-row">
+      <a class="skip" href="/me">Skip for now</a>
+      <a class="btn btn-primary" href="/me">Continue to dashboard →</a>
+    </div>
   </main>
 
   <script>
-    var form   = document.getElementById('cv-form');
     var status = document.getElementById('status');
-    var btn    = document.getElementById('submit-btn');
 
     function fmtDate(s) { try { return new Date(s).toLocaleDateString(); } catch (e) { return s; } }
 
@@ -154,22 +143,49 @@
         status.className = 'err';
         status.textContent = 'CV storage is not configured on the server yet.';
       }
-      if (d.linkedin_url)  document.getElementById('linkedin_url').value  = d.linkedin_url;
-      if (d.portfolio_url) document.getElementById('portfolio_url').value = d.portfolio_url;
-      if (d.has_cv) {
-        var cur = document.getElementById('current');
-        cur.style.display = 'block';
-        var name = d.filename || 'your CV';
-        var when = d.uploaded_at ? ' · uploaded ' + fmtDate(d.uploaded_at) : '';
-        var link = d.download_url ? ' — <a href="' + d.download_url + '" target="_blank" rel="noopener">view</a>' : '';
-        cur.innerHTML = '✓ On file: <strong>' + name + '</strong>' + when + link;
-      }
+      if (d.has_cv) renderCv(d);
       if (d.has_linkedin_pdf) renderLinkedin(d);
       if (d.has_cv || d.has_linkedin_pdf) {
         document.getElementById('fit-card').style.display = 'block';
         if (d.cv_fit) renderFit(d.cv_fit);
       }
     })();
+
+    function renderCv(d) {
+      var cur = document.getElementById('current');
+      cur.style.display = 'block';
+      var name = d.filename || 'your CV';
+      var when = d.uploaded_at ? ' · uploaded ' + fmtDate(d.uploaded_at) : '';
+      var link = d.download_url ? ' — <a href="' + d.download_url + '" target="_blank" rel="noopener">view</a>' : '';
+      cur.innerHTML = '✓ On file: <strong>' + name + '</strong>' + when + link;
+    }
+
+    document.getElementById('cv-btn').addEventListener('click', async function () {
+      var cb = document.getElementById('cv-btn');
+      var f = document.getElementById('file').files[0];
+      status.className = ''; status.textContent = '';
+      if (!f) { status.className = 'err'; status.textContent = 'Choose a CV file first.'; return; }
+      cb.disabled = true; cb.textContent = 'Uploading…';
+      var fd = new FormData(); fd.append('file', f);
+      try {
+        var r = await fetch('/api/cv', { method: 'POST', body: fd });
+        if (r.status === 401) { window.location.replace('/'); return; }
+        if (!r.ok) {
+          var detail = '';
+          try { detail = (await r.json()).detail; } catch (e) { detail = await r.text(); }
+          if (detail === 'unsupported_file_type') detail = 'Use a PDF, DOC or DOCX file.';
+          if (detail === 'file_too_large') detail = 'That file is over 10 MB.';
+          throw new Error(detail || 'failed');
+        }
+        var data = await r.json();
+        renderCv({ has_cv: true, filename: data.cv.filename, uploaded_at: new Date().toISOString() });
+        document.getElementById('fit-card').style.display = 'block';
+        status.className = 'ok'; status.textContent = 'Saved.';
+      } catch (e) {
+        status.className = 'err'; status.textContent = 'Could not save: ' + e.message;
+      }
+      cb.disabled = false; cb.textContent = 'Upload CV';
+    });
 
     function renderLinkedin(d) {
       var cur = document.getElementById('linkedin-current');
@@ -242,6 +258,8 @@
         if (!r.ok) {
           var detail = '';
           try { detail = (await r.json()).detail; } catch (e) { detail = await r.text(); }
+          if (detail === 'no_documents') detail = 'Upload your CV or LinkedIn PDF first.';
+          if (detail === 'text_unreadable') detail = 'We couldn\'t read enough text from your file — try a text-based PDF.';
           throw new Error(detail || 'failed');
         }
         renderFit((await r.json()).cv_fit);
@@ -251,40 +269,6 @@
         return;
       }
       fb.disabled = false;
-    });
-
-    form.addEventListener('submit', async function (ev) {
-      ev.preventDefault();
-      status.className = '';
-      status.textContent = '';
-      btn.disabled = true;
-      btn.textContent = 'Saving…';
-
-      var fd = new FormData();
-      var f = document.getElementById('file').files[0];
-      if (f) fd.append('file', f);
-      var li = document.getElementById('linkedin_url').value.trim();
-      var pf = document.getElementById('portfolio_url').value.trim();
-      if (li) fd.append('linkedin_url', li);
-      if (pf) fd.append('portfolio_url', pf);
-
-      try {
-        var r = await fetch('/api/cv', { method: 'POST', body: fd });
-        if (r.status === 401) { window.location.replace('/'); return; }
-        if (!r.ok) {
-          var detail = '';
-          try { detail = (await r.json()).detail; } catch (e) { detail = await r.text(); }
-          throw new Error(detail || 'failed');
-        }
-        status.className = 'ok';
-        status.textContent = 'Saved.';
-        setTimeout(function () { window.location.replace('/me'); }, 600);
-      } catch (e) {
-        status.className = 'err';
-        status.textContent = 'Could not save: ' + e.message;
-        btn.disabled = false;
-        btn.textContent = 'Save';
-      }
     });
   </script>
 </body>
