@@ -51,6 +51,9 @@ def health():
         "env": settings.app_env,
         "db_configured": bool(settings.database_url),
         "supabase_configured": bool(settings.supabase_url and settings.supabase_anon_key),
+        # storage needs the service-role key (anon key isn't enough); surfaced here
+        # so a green /health can't hide a broken CV-upload path.
+        "storage_configured": cv.is_configured(),
     }
 
 
