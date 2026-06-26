@@ -150,7 +150,7 @@ with the **end-to-end foundation flow** before extending Compass:
 Much of the spine already exists (intake, scoring/gap, master plan, daily plan — §4 &
 §5). The genuinely new pieces and decisions:
 
-- [~] **Competition Catalog Table** (NEW top priority) — auto-import EPSO *bandi* data
+- [x] **Competition Catalog Table** (NEW top priority) — auto-import EPSO *bandi* data
   (ref, grade, profile, deadline, selection-procedure tests, link to the official
   Notice) for open / in-progress / upcoming competitions; feeds gap analysis + Draft
   plan. **Scraper built 2026-06-25** (`tools/epso_benchmark/catalog_scrape.py`, reuses
@@ -164,10 +164,11 @@ Much of the spine already exists (intake, scoring/gap, master plan, daily plan �
   states which tests the candidate will face (rationale + `/plan` banner). Intake has an
   optional catalog picker that sets `profiles.target_competition_ref` (falls back to a
   grade-family test map until a competition is chosen / the catalog is loaded).
-  **Remaining:** run `scripts/migrate.py --load-catalog` once on the shared DB
-  (coordinate on Slack). *Owner: Leonardo (was Giovanni in the minute — coordinate so
+  **Done 2026-06-26:** `scripts/migrate.py --load-catalog` run on the shared DB — 7
+  in-progress competitions loaded; verified the Draft plan resolves the chosen
+  competition from the table. *Owner: Leonardo (was Giovanni in the minute — coordinate so
   it isn't rebuilt).*
-- [~] **CV upload** — Supabase Storage (private `cvs` bucket) + optional LinkedIn /
+- [x] **CV upload** — Supabase Storage (private `cvs` bucket) + optional LinkedIn /
   portfolio links; mandatory for specialist competitions, optional otherwise. *Owner:
   Leonardo.* **Scaffolded 2026-06-25:** `backend/logic/cv.py`, `POST/GET /api/cv`,
   `/cv` page, `me.html` CTA, migration `004_cv_profile_links.sql` (schema already had
@@ -183,9 +184,15 @@ Much of the spine already exists (intake, scoring/gap, master plan, daily plan �
   More → Save to PDF), parsed like a second CV. `POST /api/cv/linkedin`, migration 006
   adds the columns, `/cv` shows an inline step-by-step How-to (with a "desktop only"
   note). Verified in isolation: pypdf extracts the PDF text and the fit genuinely
-  reacts to it (it caught a planted CV-vs-LinkedIn contradiction). **Remaining:** run
-  `scripts/migrate.py` (adds 006) + `pip install -r requirements.txt` on the Railway
-  deploy (python-multipart, pypdf, python-docx); smoke-test a real upload + fit.
+  reacts to it (it caught a planted CV-vs-LinkedIn contradiction). **Done 2026-06-26:**
+  migrations 004–006 applied on the shared DB; deps (`python-multipart`, `pypdf`,
+  `python-docx`) auto-install on the Railway deploy from `requirements.txt`;
+  **end-to-end smoke-test passed against live infra** — docx CV + LinkedIn PDF uploaded
+  via the running server → both texts extracted → LLM fit (`specialist_fit=strong`)
+  written to `cv_fit_modifier` → folded into the generated Draft plan's allocation +
+  rationale. Known seam (not a blocker): `POST /api/plan/generate` still gates on the
+  legacy `profiles.target_competition`, so a catalog-only `target_competition_ref`
+  returns `400 intake_incomplete` — reconcile during the §4.6 intake refinement.
 - [ ] **Paywall at the Master Plan** — free preview of the plan for everyone; subscribe
   for full plan / advanced study sessions. Moves payments *earlier* than §5 Session 9
   (which deferred Stripe behind Compass v1). `users` already carries the Stripe columns.

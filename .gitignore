@@ -44,3 +44,6 @@ Thumbs.db
 # (scraped sample-question text is EPSO content marked "not training materials")
 tools/epso_benchmark/data/
 tools/epso_benchmark/*.zip
+
+# Local test data — personal CVs / LinkedIn exports used for manual testing, NEVER commit
+local/
