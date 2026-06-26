@@ -123,17 +123,21 @@
       <a class="btn btn-primary" href="/compass">Practice</a>
     </section>
 
-    <!-- Compass insight panel — hidden when no analysis exists yet (404 from /api/compass/insight) -->
-    <section class="card hidden" id="compass-insight-card">
+    <!-- Compass insight panel — placeholder until a pattern analysis exists -->
+    <section class="card" id="compass-insight-card">
       <h3>What we have learned about you</h3>
-      <div id="compass-insight-body" style="font-size: 14px; line-height: 1.6;"></div>
+      <div id="compass-insight-body" class="stub" style="font-size: 14px; line-height: 1.6;">
+        Once you've practised with Compass, we'll surface the patterns we spot in your answers — your strengths, recurring slips, and what to focus on next. It kicks in after about 20 practice questions. <a href="/compass">Start practising →</a>
+      </div>
       <div id="compass-insight-meta" style="font-size: 12px; color: var(--muted); margin-top: 10px;"></div>
     </section>
 
-    <!-- Compass recent sessions — hidden until ≥1 completed session exists -->
-    <section class="card hidden" id="compass-recent-card">
+    <!-- Compass recent sessions — placeholder until ≥1 completed session exists -->
+    <section class="card" id="compass-recent-card">
       <h3>Recent practice</h3>
-      <div id="compass-recent-list" style="font-size: 14px;"></div>
+      <div id="compass-recent-list" class="stub" style="font-size: 14px;">
+        Your completed Compass practice sessions will show up here. <a href="/compass">Start practising →</a>
+      </div>
     </section>
 
     <section class="card">
@@ -255,11 +259,11 @@
         if (!r.ok) return; // 404 = no analysis yet; panel stays hidden
         var d = await r.json();
         var bodyEl = document.getElementById('compass-insight-body');
+        bodyEl.className = ''; // drop the placeholder styling now that there's real content
         // Render the markdown insight as plain text (markdown rendering is overkill for one paragraph)
         bodyEl.textContent = d.insight_md || '';
         document.getElementById('compass-insight-meta').textContent =
           'Updated ' + new Date(d.generated_at).toLocaleString() + ' · skill: ' + (d.skill_id || '—');
-        document.getElementById('compass-insight-card').classList.remove('hidden');
       } catch (e) { /* swallow */ }
     })();
 
@@ -271,6 +275,7 @@
         var sessions = d.sessions || [];
         if (!sessions.length) return;
         var listEl = document.getElementById('compass-recent-list');
+        listEl.className = ''; // drop the placeholder styling
         listEl.innerHTML = '';
         sessions.forEach(function (s) {
           var when = new Date(s.completed_at).toLocaleDateString();
@@ -281,7 +286,6 @@
             s.items_correct + '/' + s.items_attempted + ' (' + acc + '%)';
           listEl.appendChild(row);
         });
-        document.getElementById('compass-recent-card').classList.remove('hidden');
       } catch (e) { /* swallow */ }
     })();
   </script>
