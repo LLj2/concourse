@@ -15,6 +15,12 @@ class Settings(BaseModel):
 
     supabase_url: str = os.getenv("SUPABASE_URL", "")
     supabase_anon_key: str = os.getenv("SUPABASE_ANON_KEY", "")
+    # service_role key — server-side only, bypasses RLS. Used for CV uploads to a
+    # PRIVATE Storage bucket. Never expose to the client / never put in config.js.
+    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    # Private Storage bucket that holds candidate CVs. Create it once in Supabase
+    # (Storage → New bucket → name=cvs, Public=off) before uploads will work.
+    supabase_cv_bucket: str = os.getenv("SUPABASE_CV_BUCKET", "cvs")
 
     stripe_secret_key: str = os.getenv("STRIPE_SECRET_KEY", "")
     stripe_webhook_secret: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")

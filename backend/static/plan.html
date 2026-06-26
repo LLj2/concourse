@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Concourse — your plan</title>
+  <title>Concourse — your draft plan</title>
   <style>
     :root {
       --ink: #0f1d3a; --muted: #5a6b8a; --accent: #1e63d6;
@@ -52,8 +52,8 @@
   </nav>
 
   <main class="wrap">
-    <h1>Your plan</h1>
-    <p class="lede">A weekly time allocation built from your measured scores and constraints, plus today's session on demand. Regenerate any time new data lands.</p>
+    <h1>Your draft plan</h1>
+    <p class="lede">A first weekly allocation built from your background (CV, competition) and what we've measured so far. It's a starting point — it sharpens into your real plan as you practise and we learn your patterns.</p>
 
     <div id="replan-banner" class="hidden" style="background:#fdf0db;border:1px solid #f0d9a8;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:12px">
       <span id="replan-reason" style="font-size:14px"></span>
@@ -63,10 +63,11 @@
     <section class="card">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <h3 style="margin:0">Weekly allocation</h3>
-        <button class="btn btn-primary" id="gen-btn">Generate plan</button>
+        <button class="btn btn-primary" id="gen-btn">Generate draft</button>
       </div>
+      <div id="competition" class="hidden" style="margin-top:12px;background:#eef3ff;border:1px solid #d4e0fb;border-radius:8px;padding:12px 14px;font-size:13px"></div>
       <div id="alloc" style="margin-top:14px"></div>
-      <div id="alloc-empty" class="stub hidden">No plan yet. Generate one above.</div>
+      <div id="alloc-empty" class="stub hidden">No draft yet. Generate one above.</div>
       <div id="rationale" class="rationale hidden"></div>
       <div class="muted" id="plan-when" style="margin-top:8px"></div>
       <div class="msg" id="gen-msg"></div>
@@ -109,8 +110,30 @@
       abstract: 'Abstract reasoning', eu_knowledge: 'EU knowledge',
       test_strategy: 'Test strategy & mocks',
     };
+    var TEST_LABEL = {
+      verbal_reasoning: 'Verbal reasoning', numerical_reasoning: 'Numerical reasoning',
+      abstract_reasoning: 'Abstract reasoning', reasoning: 'Reasoning tests',
+      eu_knowledge: 'EU knowledge', digital_skills: 'Digital skills',
+      situational_judgement: 'Situational judgement', case_study: 'Case study',
+      written_essay_eufte: 'Written essay (EUFTE)', written_test: 'Written test',
+      field_related_mcq: 'Field-related MCQ', competency_test: 'Competency test',
+      talent_screener: 'Talent screener', assessment_centre: 'Assessment centre',
+      interview: 'Interview', oral: 'Oral test',
+    };
+
+    function renderCompetition(master) {
+      var el = document.getElementById('competition');
+      var comp = master && master.allocation && master.allocation.competition;
+      if (!comp || !comp.tests || !comp.tests.length) { el.classList.add('hidden'); return; }
+      var tests = comp.tests.map(function (t) { return TEST_LABEL[t] || t; }).join(' · ');
+      var who = comp.title ? ('<strong>' + comp.title + (comp.grade ? ' (' + comp.grade + ')' : '') + '</strong>') : 'Your competition';
+      var note = comp.source === 'fallback' ? ' <span style="color:#5a6b8a">(typical tests — pick your exact competition to refine)</span>' : '';
+      el.innerHTML = '🎯 ' + who + ' — tests you\'ll face: ' + tests + note;
+      el.classList.remove('hidden');
+    }
 
     function renderAllocation(master) {
+      renderCompetition(master);
       var allocEl = document.getElementById('alloc');
       var emptyEl = document.getElementById('alloc-empty');
       var ratEl = document.getElementById('rationale');
@@ -133,7 +156,7 @@
       if (master.rationale_md) { ratEl.textContent = master.rationale_md; ratEl.classList.remove('hidden'); }
       else ratEl.classList.add('hidden');
       if (master.created_at) whenEl.textContent = 'Generated ' + new Date(master.created_at).toLocaleString() + ' · trigger: ' + (master.trigger_kind || 'manual');
-      document.getElementById('gen-btn').textContent = 'Regenerate plan';
+      document.getElementById('gen-btn').textContent = 'Regenerate draft';
     }
 
     function renderTasks(daily) {
@@ -166,7 +189,7 @@
         await load();
       } catch (e) {
         msg.className='msg err'; msg.textContent = 'Could not generate: ' + e.message;
-        genBtn.disabled = false; genBtn.textContent = 'Generate plan';
+        genBtn.disabled = false; genBtn.textContent = 'Generate draft';
       }
     });
 

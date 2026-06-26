@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Body
+from fastapi import FastAPI, Depends, HTTPException, Body, UploadFile, File, Form
 from fastapi.responses import FileResponse, RedirectResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -15,6 +15,8 @@ from backend.logic import diagnostic as dx
 from backend.logic import scoring as sc
 from backend.logic import planning as pl
 from backend.logic import adherence as ad
+from backend.logic import cv as cv
+from backend.logic import catalog as cat
 from backend.ai import client as ai
 from backend.compass.api import router as compass_router
 
@@ -86,6 +88,11 @@ def plan_page(user: dict = Depends(get_current_user)):
     return FileResponse(STATIC_DIR / "plan.html")
 
 
+@app.get("/cv")
+def cv_page(user: dict = Depends(get_current_user)):
+    return FileResponse(STATIC_DIR / "cv.html")
+
+
 # ---------- intake API ----------
 
 @app.post("/api/intake")
@@ -138,12 +145,83 @@ def submit_intake(
             "eu": payload.get("self_eu_breadth_score"),
         },
     )
+    # Optionally link the candidate to a specific catalog competition (slug/ref).
+    # Safe no-op if migration 005 hasn't added the column yet.
+    cat.set_target_ref(db, user["user_id"], payload.get("target_competition_ref"))
     db.execute(
         text("insert into events (user_id, kind, payload) values (:u, 'intake_completed', :p)"),
         {"u": user["user_id"], "p": json.dumps({"weeks_to_exam": payload.get("weeks_to_exam")})},
     )
     db.commit()
     return {"ok": True}
+
+
+# ---------- CV + profile links API (foundation flow) ----------
+
+@app.get("/api/cv")
+def get_cv(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Current CV + links for this user (with a short-lived download URL)."""
+    return cv.get_status(db, user["user_id"])
+
+
+@app.post("/api/cv")
+def post_cv(
+    file: Optional[UploadFile] = File(default=None),
+    linkedin_url: Optional[str] = Form(default=None),
+    portfolio_url: Optional[str] = Form(default=None),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Upload a CV and/or save profile links. Both parts are optional so the
+    user can add links now and the CV later — but at least one must be present."""
+    if file is None and not (linkedin_url or portfolio_url):
+        raise HTTPException(status_code=400, detail="nothing_to_save")
+
+    result: dict = {}
+    if file is not None:
+        try:
+            data = file.file.read()
+            result["cv"] = cv.save_cv(db, user["user_id"], file.filename or "cv", data)
+        except cv.CvError as e:
+            raise HTTPException(status_code=e.status, detail=e.code)
+        finally:
+            file.file.close()
+
+    result["links"] = cv.save_links(db, user["user_id"], linkedin_url, portfolio_url)
+    return {"ok": True, **result}
+
+
+@app.post("/api/cv/linkedin")
+def post_cv_linkedin(
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Upload the user's LinkedIn 'Save to PDF' export (parsed like a CV)."""
+    try:
+        data = file.file.read()
+        return {"ok": True, "linkedin": cv.save_linkedin_pdf(
+            db, user["user_id"], file.filename or "linkedin.pdf", data)}
+    except cv.CvError as e:
+        raise HTTPException(status_code=e.status, detail=e.code)
+    finally:
+        file.file.close()
+
+
+@app.post("/api/cv/fit")
+def post_cv_fit(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Run (and cache) the LLM CV-fit read for the target competition. Explicit
+    because it costs an LLM call — like /api/profile/narrate."""
+    try:
+        return {"cv_fit": cv.analyze_fit(db, user["user_id"])}
+    except cv.CvError as e:
+        raise HTTPException(status_code=e.status, detail=e.code)
 
 
 @app.get("/api/me")
@@ -300,6 +378,19 @@ def narrate_profile(
     except Exception as e:  # transport / model error -> clean 502, not a 500 crash
         raise HTTPException(status_code=502, detail=f"ai_failed: {e}")
     return {"narrative": narrative}
+
+
+# ---------- competition catalog API (foundation flow) ----------
+
+@app.get("/api/competitions")
+def get_competitions(
+    status: Optional[str] = None,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Catalog of EPSO competitions (from the scraper). Empty list if the catalog
+    table isn't loaded yet — callers degrade gracefully."""
+    return {"competitions": cat.list_competitions(db, status=status)}
 
 
 # ---------- plan API (Sessions 6-7) ----------

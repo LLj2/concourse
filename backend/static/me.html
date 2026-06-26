@@ -97,6 +97,14 @@
       </dl>
     </section>
 
+    <section class="card cta" id="cv-card">
+      <div class="copy">
+        <h3 id="cv-title">Add your CV</h3>
+        <p id="cv-sub">Upload your CV (and LinkedIn / portfolio) so the plan reflects your background. Required for specialist competitions.</p>
+      </div>
+      <a class="btn btn-primary" id="cv-btn" href="/cv">Add</a>
+    </section>
+
     <section class="card cta" id="diag-card">
       <div class="copy">
         <h3 id="diag-title">5-minute calibration check</h3>
@@ -143,8 +151,8 @@
 
     <section class="card cta">
       <div class="copy">
-        <h3>Your study plan</h3>
-        <p>A weekly time allocation from your scores and constraints, plus today's session.</p>
+        <h3>Your draft plan</h3>
+        <p>A first weekly allocation from your CV, target competition and scores — it sharpens into your real plan as you practise.</p>
       </div>
       <a class="btn btn-primary" href="/plan">Open</a>
     </section>
@@ -213,6 +221,20 @@
         document.getElementById('diag-title').textContent = 'Re-calibrate any time';
         document.getElementById('diag-sub').textContent = 'A fresh check refreshes your baseline and triggers a plan refresh.';
       }
+
+      // Reflect CV status on the CV card
+      try {
+        var cvR = await fetch('/api/cv');
+        if (cvR.ok) {
+          var cvD = await cvR.json();
+          if (cvD.has_cv) {
+            document.getElementById('cv-title').textContent = 'CV on file ✓';
+            document.getElementById('cv-sub').textContent =
+              (cvD.filename || 'Your CV') + ' is uploaded. Update it or your links any time.';
+            document.getElementById('cv-btn').textContent = 'Update';
+          }
+        }
+      } catch (e) { /* non-blocking */ }
     })();
 
     document.getElementById('logout').addEventListener('click', async function () {
