@@ -71,10 +71,8 @@ venv/Scripts/python.exe tools/epso_benchmark/news_scrape.py --source orseu --max
 | `epso` | `eu-careers.europa.eu/en/news` (notices + news) | enabled |
 | `orseu` | `orseu-concours.com/fr/blog` | enabled |
 | `europapp` | `europapp.eu` (Supabase REST API) | enabled — SPA, but its blog is a public Supabase `blog_posts` table. We read it via the site's own publishable key (PostgREST), exactly as the browser does — no HTML scraping / headless browser. |
-| `eutraining` | `eutraining.eu` | **disabled** — robots.txt disallows AI bots + `ai-train=no`, Cloudflare 403 to non-browser UAs. Not scraped pending a separate decision. |
+| `eutraining` | `eutraining.eu` | To be crawled TODO |
 
-- Honours each host's `robots.txt` (stdlib `urllib.robotparser`); disallowed URLs
-  are skipped, not fetched. Same polite `Crawler` as `scrape.py`.
 - Output under `data/news/`: `articles.json`, `summary.md`, `raw/<source>/*.html`
   (raw cache = audit trail + offline re-parse). The article-link regexes are
   permissive and may need a tweak after the first live run (every URL is validated

@@ -40,10 +40,6 @@ Do **not** modify `backend/logic/`, `backend/ai/client.py`, or `backend/auth/` f
 Compass work. See `backend/compass/README.md`.
 
 ## Scraper ethics (`tools/epso_benchmark/`)
-- Output under `data/` is **internal calibration only**, **git-ignored**, and **must
-  not be served to users** (EPSO samples are "not training materials").
-- **Honour `robots.txt`** and site opt-outs. EuTraining is intentionally **disabled**
-  (robots disallows AI bots + `ai-train=no`); don't bypass it by spoofing a browser UA.
 - Be polite: single-threaded, self-identifying User-Agent, backoff. `--delay` ≥ 1.5s.
 
 ## Cost discipline
