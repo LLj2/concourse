@@ -136,7 +136,7 @@
 <body>
   <nav class="nav">
     <div class="brand">Concourse</div>
-    <a href="#waitlist">Sign in</a>
+    <a id="signin-cta" href="#">Sign in</a>
   </nav>
 
   <section class="hero">
@@ -173,7 +173,7 @@
   <!-- Signup modal -->
   <div class="modal-bg" id="signup-modal" role="dialog" aria-modal="true">
     <div class="modal">
-      <h2>Start your trial</h2>
+      <h2 id="signup-title">Start your trial</h2>
       <p id="signup-intro">We email you a sign-in link. Click it from this device to sign in. No password to remember.</p>
 
       <!-- Step 1: email -->
@@ -275,8 +275,12 @@
       stepSent.style.display = '';
       codeInput.value = '';
     }
-    function openModal() {
-      submitBtn.disabled = false; submitBtn.textContent = 'Send sign-in email';
+    var titleEl = document.getElementById('signup-title');
+    function openModal(mode) {
+      var signin = mode === 'signin';
+      titleEl.textContent = signin ? 'Sign in' : 'Start your trial';
+      submitBtn.disabled = false;
+      submitBtn.textContent = signin ? 'Email me a sign-in link' : 'Send sign-in email';
       verifyBtn.disabled = false; verifyBtn.textContent = 'Verify & sign in';
       modal.classList.add('open');
       showEmailStep();
@@ -286,7 +290,12 @@
     document.getElementById('trial-cta').addEventListener('click', function (e) {
       e.preventDefault();
       if (window.posthog) posthog.capture('landing_cta_click', { cta: 'start_trial' });
-      openModal();
+      openModal('trial');
+    });
+    document.getElementById('signin-cta').addEventListener('click', function (e) {
+      e.preventDefault();
+      if (window.posthog) posthog.capture('landing_cta_click', { cta: 'sign_in' });
+      openModal('signin');
     });
     document.getElementById('signup-cancel').addEventListener('click', closeModal);
     document.getElementById('code-back').addEventListener('click', showEmailStep);

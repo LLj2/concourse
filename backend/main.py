@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Body, UploadFile, File, Form
+from fastapi import FastAPI, Depends, HTTPException, Body, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -27,6 +27,18 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 app.include_router(auth_router)
 app.include_router(compass_router)
+
+
+@app.middleware("http")
+async def no_cache_html(request: Request, call_next):
+    """HTML/JS responses carry no explicit caching, so browsers heuristically
+    serve stale copies (e.g. a logged-out user seeing a cached page, or stale
+    inline JS). Force revalidation on every navigable document + our config/JS."""
+    response = await call_next(request)
+    ctype = response.headers.get("content-type", "")
+    if ctype.startswith("text/html") or "javascript" in ctype:
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 # ---------- public pages ----------
