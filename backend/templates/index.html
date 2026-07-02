@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Concourse — your EPSO study coach{% endblock %}
+
+{% block meta %}
+<meta name="description" content="An AI study coach that builds your EPSO preparation plan from your real performance, not your guesses." />
+{% endblock %}
+
+{% block head %}
+<style>
+  .hero {
+    margin: var(--sp-16) auto var(--sp-10);
+    text-align: center;
+  }
+  .hero h1 {
+    font-size: var(--text-4xl);
+    font-weight: var(--weight-bold);
+    line-height: 1.1;
+    margin: 0 0 var(--sp-5);
+  }
+  .hero .lede {
+    font-size: var(--text-lg);
+    margin: 0 auto var(--sp-8);
+    max-width: 600px;
+  }
+  .cta-row { display: flex; gap: var(--sp-3); justify-content: center; align-items: center; flex-wrap: wrap; }
+  .cta-meta { color: var(--faint); font-size: var(--text-sm); margin-top: var(--sp-4); }
+  .how-link { font-size: var(--text-sm); color: var(--muted); }
+
+  .features {
+    margin: var(--sp-16) auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--sp-4);
+  }
+  .feature h3 { margin: 0 0 var(--sp-2); font-size: var(--text-md); font-weight: var(--weight-semibold); }
+  .feature p { margin: 0; color: var(--muted); font-size: var(--text-sm); }
+  @media (max-width: 720px) {
+    .hero { margin-top: var(--sp-10); }
+    .hero h1 { font-size: var(--text-3xl); }
+    .features { grid-template-columns: 1fr; }
+  }
+</style>
+<script>
+  /* First-touch UTM capture — must run before PostHog init (app.js). */
+  (function captureUtm() {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var keys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+      var hasAny = keys.some(function (k) { return params.has(k); });
+      if (!hasAny) return;
+      var existing = JSON.parse(localStorage.getItem('concourse_utm') || 'null');
+      if (existing) return; /* first-touch wins */
+      var payload = { captured_at: new Date().toISOString() };
+      keys.forEach(function (k) {
+        if (params.has(k)) payload[k] = params.get(k);
+      });
+      localStorage.setItem('concourse_utm', JSON.stringify(payload));
+    } catch (e) { /* swallow */ }
+  })();
+</script>
+{% endblock %}
+
+{% block nav %}
+<nav class="site-nav site-nav-wide" aria-label="Main">
+  <a class="brand" href="/">Concourse</a>
+  <div class="nav-links">
+    <a class="nav-link" id="signin-cta" href="#">Sign in</a>
+  </div>
+</nav>
+{% endblock %}
+
+{% block wrap_class %}wrap-wide{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>Your EPSO coach. Built around the way you actually study.</h1>
+  <p class="lede">
+    Concourse measures your real reasoning skill, watches what you practise on EUTraining and ORSEU, and rewrites your plan whenever the data changes. Not when a calendar says so.
+  </p>
+  <div class="cta-row">
+    <a id="trial-cta" class="btn btn-primary" href="#waitlist">Start 7-day trial</a>
+    <a class="how-link" href="#how">How it works ↓</a>
+  </div>
+  <div class="cta-meta">€24.99/month after trial. Card required at signup.</div>
+</section>
+
+<section class="features" id="how" aria-label="How it works">
+  <div class="card feature">
+    <h3>Measure, do not guess</h3>
+    <p>Short in-product checks calibrate your verbal, numerical, and abstract reasoning over time. No hour-long intake test.</p>
+  </div>
+  <div class="card feature">
+    <h3>Bring your practice</h3>
+    <p>Paste or screenshot your EUTraining results. Concourse parses them and adjusts your plan within minutes.</p>
+  </div>
+  <div class="card feature">
+    <h3>Plan that updates itself</h3>
+    <p>New data triggers a rewrite. You see what changed and why, every time.</p>
+  </div>
+</section>
+
+<!-- Signup modal -->
+<div class="modal-scrim" id="signup-modal" role="dialog" aria-modal="true" aria-labelledby="signup-title">
+  <div class="modal-panel">
+    <h2 id="signup-title">Start your trial</h2>
+    <p class="modal-intro" id="signup-intro">We email you a sign-in link. Click it from this device to sign in. No password to remember.</p>
+
+    <!-- Step 1: email -->
+    <div id="step-email">
+      <label class="field">
+        <span class="field-label">Email</span>
+        <input type="email" class="input" id="signup-email" placeholder="you@example.com" autocomplete="email" />
+      </label>
+      <div style="display: flex; gap: var(--sp-2);">
+        <button class="btn btn-secondary" id="signup-cancel" type="button" style="flex: 1;">Cancel</button>
+        <button class="btn btn-primary" id="signup-submit" type="button" style="flex: 1;">Send sign-in email</button>
+      </div>
+    </div>
+
+    <!-- Step 2: email sent — link is primary, 6-digit code is an optional fallback -->
+    <div id="step-sent" style="display: none;">
+      <p class="field-hint" style="margin-bottom: var(--sp-4);">Check your inbox and click the sign-in link to continue.</p>
+      <details id="code-fallback" style="margin-bottom: var(--sp-4);">
+        <summary style="cursor: pointer; font-size: var(--text-sm); color: var(--accent); margin-bottom: var(--sp-3);">Got a 6-digit code instead? Enter it here</summary>
+        <label class="field">
+          <span class="field-label visually-hidden">6-digit code</span>
+          <input type="text" class="input" id="signup-code" placeholder="123456"
+                 style="text-align: center; font-size: var(--text-xl); letter-spacing: 8px; font-weight: var(--weight-semibold);"
+                 inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+        </label>
+        <button class="btn btn-primary" id="code-submit" type="button" style="width: 100%;">Verify &amp; sign in</button>
+      </details>
+      <button class="btn btn-ghost" id="code-back" type="button" style="width: 100%;">Use a different email</button>
+    </div>
+
+    <div class="msg" id="signup-msg" aria-live="polite" style="margin-top: var(--sp-3);"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block footer %}
+<footer class="site-footer site-footer-wide">
+  Concourse · EPSO preparation, AI-orchestrated · <a href="/health">status</a>
+</footer>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ===========================
+  // Signup modal — magic link primary, 6-digit OTP as optional fallback
+  // (PostHog init + UTM registration handled by the shared app.js)
+  // ===========================
+  var modal = document.getElementById('signup-modal');
+  var emailInput = document.getElementById('signup-email');
+  var codeInput = document.getElementById('signup-code');
+  var stepEmail = document.getElementById('step-email');
+  var stepSent = document.getElementById('step-sent');
+  var msg = document.getElementById('signup-msg');
+  var submitBtn = document.getElementById('signup-submit');
+  var verifyBtn = document.getElementById('code-submit');
+
+  function getUtm() {
+    try { return JSON.parse(localStorage.getItem('concourse_utm') || 'null'); }
+    catch (e) { return null; }
+  }
+  function showEmailStep() {
+    stepSent.style.display = 'none';
+    stepEmail.style.display = '';
+    msg.textContent = ''; msg.className = 'msg';
+    setTimeout(function () { emailInput.focus(); }, 50);
+  }
+  function showSentStep() {
+    stepEmail.style.display = 'none';
+    stepSent.style.display = '';
+    codeInput.value = '';
+  }
+  var titleEl = document.getElementById('signup-title');
+  function openModal(mode) {
+    var signin = mode === 'signin';
+    titleEl.textContent = signin ? 'Sign in' : 'Start your trial';
+    submitBtn.disabled = false;
+    submitBtn.textContent = signin ? 'Email me a sign-in link' : 'Send sign-in email';
+    verifyBtn.disabled = false; verifyBtn.textContent = 'Verify & sign in';
+    modal.classList.add('open');
+    showEmailStep();
+  }
+  function closeModal() { modal.classList.remove('open'); }
+
+  document.getElementById('trial-cta').addEventListener('click', function (e) {
+    e.preventDefault();
+    if (window.ctrack) ctrack('landing_cta_click', { cta: 'start_trial' });
+    openModal('trial');
+  });
+  document.getElementById('signin-cta').addEventListener('click', function (e) {
+    e.preventDefault();
+    if (window.ctrack) ctrack('landing_cta_click', { cta: 'sign_in' });
+    openModal('signin');
+  });
+  document.getElementById('signup-cancel').addEventListener('click', closeModal);
+  document.getElementById('code-back').addEventListener('click', showEmailStep);
+  /* scrim-click + Escape close handled by shared app.js */
+
+  // Step 1 — request the sign-in email (link + code, depending on Supabase setup)
+  submitBtn.addEventListener('click', async function () {
+    var email = emailInput.value.trim();
+    if (!email || !email.includes('@')) {
+      msg.className = 'msg msg-err'; msg.textContent = 'Enter a valid email.'; return;
+    }
+    submitBtn.disabled = true; submitBtn.textContent = 'Sending…';
+    msg.className = 'msg'; msg.textContent = '';
+    try {
+      var r = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ email: email, utm: getUtm() }),
+      });
+      if (!r.ok) throw new Error((await r.text()) || 'request failed');
+      if (window.ctrack) ctrack('auth_link_requested', { email_domain: email.split('@')[1] });
+      showSentStep();
+      msg.className = 'msg msg-ok';
+      msg.textContent = 'Sent to ' + email + '. Click the sign-in link in the email.';
+    } catch (e) {
+      msg.className = 'msg msg-err';
+      msg.textContent = 'Could not send email: ' + e.message;
+      submitBtn.disabled = false; submitBtn.textContent = 'Send sign-in email';
+    }
+  });
+
+  // Step 2 — verify the typed code
+  async function verifyCode() {
+    var email = emailInput.value.trim();
+    var code = codeInput.value.trim();
+    if (!/^\d{6}$/.test(code)) {
+      msg.className = 'msg msg-err'; msg.textContent = 'Enter the 6-digit code from your email.'; return;
+    }
+    verifyBtn.disabled = true; verifyBtn.textContent = 'Verifying…';
+    msg.className = 'msg'; msg.textContent = '';
+    try {
+      var r = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ email: email, token: code, utm: getUtm() }),
+      });
+      if (!r.ok) throw new Error((await r.text()) || 'request failed');
+      var data = await r.json();
+      if (window.ctrack) ctrack('auth_completed', { method: 'otp_code', email_domain: email.split('@')[1] });
+      window.location.replace(data.next || '/intake');
+    } catch (e) {
+      msg.className = 'msg msg-err';
+      msg.textContent = 'Invalid or expired code. Check the email and try again.';
+      verifyBtn.disabled = false; verifyBtn.textContent = 'Verify & sign in';
+    }
+  }
+  verifyBtn.addEventListener('click', verifyCode);
+  codeInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') verifyCode();
+  });
+</script>
+{% endblock %}

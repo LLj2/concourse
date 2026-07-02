@@ -63,10 +63,10 @@ def health():
 
 
 @app.get("/")
-def root(user: Optional[dict] = Depends(get_optional_user)):
+def root(request: Request, user: Optional[dict] = Depends(get_optional_user)):
     if user:
         return RedirectResponse(url="/me", status_code=302)
-    return FileResponse(STATIC_DIR / "index.html")
+    return TEMPLATES.TemplateResponse(request, "index.html")
 
 
 @app.get("/config.js")
