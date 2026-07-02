@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% set nav_active = 'me' %}
+
+{% block title %}Concourse — dashboard{% endblock %}
+
+{% block head %}
+<style>
+  /* page-specific: score tiles */
+  .scores-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-3); }
+  @media (max-width: 480px) { .scores-grid { grid-template-columns: 1fr; } }
+  .skill-score {
+    background: var(--surface-sunken); border: 1px solid var(--border);
+    border-radius: var(--r-md); padding: var(--sp-4);
+  }
+  .skill-score .lab { font-size: var(--text-xs); color: var(--muted); margin-bottom: var(--sp-1); }
+  .skill-score .val { font-size: var(--text-2xl); font-weight: var(--weight-bold); color: var(--accent); }
+  .skill-score .when { font-size: var(--text-xs); color: var(--faint); margin-top: 2px; }
+  .subhead { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--muted); margin: var(--sp-5) 0 var(--sp-3); }
+  .recent-row { padding: var(--sp-2) 0; border-bottom: 1px solid var(--border); font-size: var(--text-sm); }
+  .recent-row:last-child { border-bottom: 0; }
+  .quick-links { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-4); }
+  .next-step { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); padding: var(--sp-3) 0; border-bottom: 1px solid var(--border); }
+  .next-step:last-child { border-bottom: 0; padding-bottom: 0; }
+  .next-step .copy h3 { font-size: var(--text-sm); font-weight: var(--weight-semibold); margin: 0 0 2px; }
+  .next-step .copy p { margin: 0; color: var(--muted); font-size: var(--text-sm); }
+  @media (max-width: 480px) { .next-step { flex-direction: column; align-items: stretch; } }
+  .hidden { display: none; }
+  #trend-block canvas { max-width: 100%; }
+</style>
+{% endblock %}
+
+{% block content %}
+<header>
+  <h1 id="greeting" class="page-title">Welcome.</h1>
+  <p class="lede">Your preparation at a glance — practice, progress, and what we're learning about how you reason.</p>
+</header>
+
+<!-- 1 · Primary action: practice -->
+<section class="card card-cta" aria-labelledby="compass-title">
+  <div class="card-cta-copy">
+    <h2 class="card-title" id="compass-title">Practice with Compass</h2>
+    <p>Adaptive verbal practice. Each question targets the patterns we've identified in your previous answers.</p>
+  </div>
+  <a class="btn btn-primary" href="/compass">Start practising</a>
+</section>
+
+<!-- 2 · Progress: baseline scores + practice trend + recent sessions -->
+<section class="card" aria-labelledby="progress-title">
+  <h2 class="card-title" id="progress-title">Progress</h2>
+
+  <div id="scores-empty" class="empty-state">
+    No calibration data yet — take the <a href="/diagnostic">5-minute calibration check</a> to see your baseline.
+  </div>
+  <div id="scores" class="scores-grid"></div>
+
+  <div id="trend-block" class="hidden">
+    <h3 class="subhead">Practice accuracy over recent sessions <span class="provenance">· Your data</span></h3>
+    <canvas id="trend-canvas" height="170" role="img" aria-label="Line chart of practice accuracy over your recent Compass sessions"></canvas>
+    <p class="meta-line" id="trend-summary"></p>
+  </div>
+
+  <h3 class="subhead">Recent practice</h3>
+  <div id="compass-recent-list" class="empty-state">
+    Your completed Compass practice sessions will show up here. <a href="/compass">Start practising →</a>
+  </div>
+</section>
+
+<!-- 3 · AI insight -->
+<section class="card" aria-labelledby="insight-title">
+  <h2 class="card-title" id="insight-title">What we've learned about you <span class="provenance">· Concourse analysis</span></h2>
+  <div id="compass-insight-body" class="empty-state">
+    Once you've practised with Compass, we'll surface the patterns we spot in your answers — your strengths, recurring slips, and what to focus on next. It kicks in after about 20 practice questions. <a href="/compass">Start practising →</a>
+  </div>
+  <div id="compass-insight-meta" class="meta-line"></div>
+</section>
+
+<!-- 4 · Your prep -->
+<section class="card" aria-labelledby="prep-title">
+  <h2 class="card-title" id="prep-title">Your prep <span class="badge badge-accent" id="status-pill">configured</span></h2>
+  <dl class="kv">
+    <dt>Target competition</dt><dd id="f-comp">—</dd>
+    <dt>Weeks to exam</dt><dd id="f-weeks">—</dd>
+    <dt>Hours per week</dt><dd id="f-hours">—</dd>
+    <dt>Energy pattern</dt><dd id="f-energy">—</dd>
+    <dt>Prior EPSO experience</dt><dd id="f-prior">—</dd>
+    <dt>Self-rated habits</dt><dd id="f-habits">—</dd>
+    <dt>Self-rated strategy</dt><dd id="f-strat">—</dd>
+    <dt>Self-rated EU breadth</dt><dd id="f-eu">—</dd>
+    <dt>Email</dt><dd id="f-email">—</dd>
+    <dt>Joined</dt><dd id="f-created">—</dd>
+    <dt>Source</dt><dd id="f-source">—</dd>
+  </dl>
+  <div class="quick-links">
+    <a class="btn btn-secondary btn-sm" href="/profile">Profile &amp; AI insights</a>
+    <a class="btn btn-secondary btn-sm" href="/plan">Your draft plan</a>
+  </div>
+</section>
+
+<!-- 5 · Next steps -->
+<section class="card" aria-labelledby="next-title">
+  <h2 class="card-title" id="next-title">Next steps</h2>
+
+  <div class="next-step" id="cv-card">
+    <div class="copy">
+      <h3 id="cv-title">Add your CV</h3>
+      <p id="cv-sub">Upload your CV (and LinkedIn / portfolio) so the plan reflects your background. Required for specialist competitions.</p>
+    </div>
+    <a class="btn btn-secondary btn-sm" id="cv-btn" href="/cv">Add</a>
+  </div>
+
+  <div class="next-step" id="diag-card">
+    <div class="copy">
+      <h3 id="diag-title">5-minute calibration check</h3>
+      <p id="diag-sub">Take a short adaptive quiz so we can baseline your verbal reasoning. Re-take any time.</p>
+    </div>
+    <a class="btn btn-secondary btn-sm" href="/diagnostic">Start</a>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart.js is the one allowed CDN script (dashboard charts) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+<script>
+  function fmtDate(s) {
+    if (!s) return '—';
+    try { return new Date(s).toLocaleDateString(); } catch (e) { return s; }
+  }
+  function score(n) { return n ? n + ' / 5' : '—'; }
+  function energy(o) {
+    if (!o) return '—';
+    var parts = [];
+    if (o.morning)   parts.push('morning ' + o.morning);
+    if (o.afternoon) parts.push('afternoon ' + o.afternoon);
+    if (o.evening)   parts.push('evening ' + o.evening);
+    return parts.join(' · ') || '—';
+  }
+
+  (async function load() {
+    var r = await fetch('/api/me');
+    if (r.status === 401) { window.location.replace('/'); return; }
+    var d = await r.json();
+    document.getElementById('greeting').textContent = 'Welcome, ' + (d.email || 'there') + '.';
+    document.getElementById('f-email').textContent   = d.email || '—';
+    document.getElementById('f-created').textContent = fmtDate(d.created_at);
+    document.getElementById('f-source').textContent  = d.utm_source || 'direct';
+    document.getElementById('f-comp').textContent    = d.target_competition || '—';
+    document.getElementById('f-weeks').textContent   = d.weeks_to_exam ? d.weeks_to_exam + ' weeks' : '—';
+    document.getElementById('f-hours').textContent   = d.weekly_hours ? d.weekly_hours + ' h/week' : '—';
+    document.getElementById('f-energy').textContent  = energy(d.energy_pattern);
+    document.getElementById('f-prior').textContent   = d.has_prior_epso_experience === true ? 'Yes' : (d.has_prior_epso_experience === false ? 'Not yet' : '—');
+    document.getElementById('f-habits').textContent  = score(d.self_habits_score);
+    document.getElementById('f-strat').textContent   = score(d.self_strategy_score);
+    document.getElementById('f-eu').textContent      = score(d.self_eu_breadth_score);
+
+    if (!d.target_competition) {
+      var pill = document.getElementById('status-pill');
+      pill.textContent = 'incomplete';
+      pill.className = 'badge badge-warn';
+    }
+
+    // Latest scores
+    var scoresEl = document.getElementById('scores');
+    var emptyEl  = document.getElementById('scores-empty');
+    var skillName = {
+      verbal: 'Verbal reasoning',
+      numerical: 'Numerical reasoning',
+      abstract: 'Abstract reasoning',
+      eu_knowledge: 'EU knowledge',
+    };
+    if (d.latest_scores && d.latest_scores.length > 0) {
+      emptyEl.style.display = 'none';
+      scoresEl.innerHTML = '';
+      d.latest_scores.forEach(function (s) {
+        var div = document.createElement('div');
+        div.className = 'skill-score';
+        div.innerHTML =
+          '<div class="lab">' + (skillName[s.skill_id] || s.skill_id) + '</div>' +
+          '<div class="val">' + Math.round(s.score) + '</div>' +
+          '<div class="when">' + new Date(s.completed_at).toLocaleString() + '</div>';
+        scoresEl.appendChild(div);
+      });
+      // refine the diagnostic card copy if user already has a score
+      document.getElementById('diag-title').textContent = 'Re-calibrate any time';
+      document.getElementById('diag-sub').textContent = 'A fresh check refreshes your baseline and triggers a plan refresh.';
+    }
+
+    // Reflect CV status on the CV step
+    try {
+      var cvR = await fetch('/api/cv');
+      if (cvR.ok) {
+        var cvD = await cvR.json();
+        if (cvD.has_cv) {
+          document.getElementById('cv-title').textContent = 'CV on file ✓';
+          document.getElementById('cv-sub').textContent =
+            (cvD.filename || 'Your CV') + ' is uploaded. Update it or your links any time.';
+          document.getElementById('cv-btn').textContent = 'Update';
+        }
+      }
+    } catch (e) { /* non-blocking */ }
+  })();
+
+  // =====================================================================
+  // Compass — insight panel + recent sessions (+ accuracy trend chart)
+  // Both endpoints return 404 cleanly when Compass has nothing yet,
+  // and the panels degrade by keeping their empty states.
+  // =====================================================================
+  (async function loadCompassInsight() {
+    try {
+      var r = await fetch('/api/compass/insight');
+      if (!r.ok) return; // 404 = no analysis yet
+      var d = await r.json();
+      var bodyEl = document.getElementById('compass-insight-body');
+      bodyEl.className = 'ai-insight';
+      bodyEl.textContent = d.insight_md || '';
+      document.getElementById('compass-insight-meta').textContent =
+        'Updated ' + new Date(d.generated_at).toLocaleString() + ' · skill: ' + (d.skill_id || '—');
+    } catch (e) { /* swallow */ }
+  })();
+
+  // Draw the accuracy trend with Chart.js once it (deferred CDN) is available.
+  function whenChartReady(fn) {
+    if (window.Chart) { fn(); return; }
+    window.addEventListener('load', function () { if (window.Chart) fn(); });
+  }
+
+  (async function loadCompassRecent() {
+    try {
+      var r = await fetch('/api/compass/practice/recent');
+      if (!r.ok) return;
+      var d = await r.json();
+      var sessions = d.sessions || [];
+      if (!sessions.length) return;
+
+      // Recent list
+      var listEl = document.getElementById('compass-recent-list');
+      listEl.className = '';
+      listEl.innerHTML = '';
+      sessions.forEach(function (s) {
+        var when = new Date(s.completed_at).toLocaleDateString();
+        var acc = s.items_attempted ? Math.round(100 * s.items_correct / s.items_attempted) : 0;
+        var row = document.createElement('div');
+        row.className = 'recent-row';
+        row.textContent = when + ' · ' + s.skill_id + ' · ' +
+          s.items_correct + '/' + s.items_attempted + ' (' + acc + '%)';
+        listEl.appendChild(row);
+      });
+
+      // Accuracy trend (needs ≥2 sessions to be a line)
+      var pts = sessions
+        .filter(function (s) { return s.items_attempted; })
+        .map(function (s) {
+          return {
+            when: new Date(s.completed_at),
+            acc: Math.round(100 * s.items_correct / s.items_attempted),
+          };
+        })
+        .sort(function (a, b) { return a.when - b.when; });
+      if (pts.length < 2) return;
+
+      document.getElementById('trend-block').classList.remove('hidden');
+      var first = pts[0].acc, last = pts[pts.length - 1].acc;
+      var delta = last - first;
+      document.getElementById('trend-summary').textContent =
+        'Across your last ' + pts.length + ' sessions, accuracy went from ' + first + '% to ' + last + '% (' +
+        (delta >= 0 ? '+' : '') + delta + ' points).';
+
+      whenChartReady(function () {
+        var styles = getComputedStyle(document.documentElement);
+        var accent = styles.getPropertyValue('--accent').trim();
+        var border = styles.getPropertyValue('--border').trim();
+        var muted  = styles.getPropertyValue('--muted').trim();
+        new Chart(document.getElementById('trend-canvas'), {
+          type: 'line',
+          data: {
+            labels: pts.map(function (p) { return p.when.toLocaleDateString(); }),
+            datasets: [{
+              label: 'Accuracy %',
+              data: pts.map(function (p) { return p.acc; }),
+              borderColor: accent,
+              backgroundColor: accent,
+              pointRadius: 3,
+              tension: 0.25,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { min: 0, max: 100, grid: { color: border }, ticks: { color: muted, callback: function (v) { return v + '%'; } } },
+              x: { grid: { display: false }, ticks: { color: muted } },
+            },
+          },
+        });
+      });
+    } catch (e) { /* swallow */ }
+  })();
+</script>
+{% endblock %}

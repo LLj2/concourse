@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Concourse{% endblock %}</title>
+  {% block meta %}{% endblock %}
+  <link rel="stylesheet" href="/static/css/tokens.css?v=1" />
+  <link rel="stylesheet" href="/static/css/base.css?v=1" />
+  <link rel="stylesheet" href="/static/css/components.css?v=1" />
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  {% block nav %}
+  <nav class="site-nav" aria-label="Main">
+    <a class="brand" href="/me">Concourse</a>
+    <div class="nav-links">
+      <a class="nav-link" href="/me" {% if nav_active == 'me' %}aria-current="page"{% endif %}>Dashboard</a>
+      <a class="nav-link" href="/compass" {% if nav_active == 'compass' %}aria-current="page"{% endif %}>Practice</a>
+      <a class="nav-link" href="/plan" {% if nav_active == 'plan' %}aria-current="page"{% endif %}>Plan</a>
+      <button class="nav-link" type="button" data-logout>Log out</button>
+    </div>
+  </nav>
+  {% endblock %}
+
+  <main id="main" class="wrap {% block wrap_class %}{% endblock %}">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block footer %}{% endblock %}
+
+  <script src="/config.js"></script>
+  <script src="/static/js/app.js?v=1"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

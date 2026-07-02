@@ -1,0 +1,167 @@
+/* ============================================================================
+   Concourse base styles — reset, typography, shell (nav / wrap / footer).
+   Depends on tokens.css. Version-string when it changes (base.css?v=N).
+   ========================================================================== */
+
+/* ---- Reset ---------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- Typography ------------------------------------------------------------ */
+h1, h2, h3, h4 {
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  margin: 0;
+}
+
+p { margin: 0 0 var(--sp-4); }
+
+a { color: var(--accent); }
+a:hover { color: var(--accent-hover); }
+
+small { font-size: var(--text-sm); }
+
+::selection { background: var(--accent-soft-border); }
+
+/* ---- Focus visibility (keyboard) -------------------------------------------- */
+:focus { outline: none; }
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--r-sm);
+}
+
+/* Skip link for keyboard/screen-reader users */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: var(--sp-2);
+  z-index: 100;
+  background: var(--surface);
+  color: var(--accent);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+}
+.skip-link:focus { left: var(--sp-2); }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip: rect(0 0 0 0); clip-path: inset(50%);
+  overflow: hidden; white-space: nowrap;
+}
+
+/* ---- Layout: page wrap -------------------------------------------------------- */
+.wrap {
+  max-width: var(--wrap);
+  margin: var(--sp-5) auto var(--sp-16);
+  padding: 0 var(--sp-6);
+}
+.wrap-narrow { max-width: var(--wrap-narrow); }
+.wrap-wide   { max-width: var(--wrap-wide); }
+
+/* ---- Shell: top navigation ------------------------------------------------------ */
+.site-nav {
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: var(--sp-4) var(--sp-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  min-height: var(--touch);
+}
+.site-nav.site-nav-wide { max-width: var(--wrap-wide); }
+
+.brand {
+  font-weight: var(--weight-bold);
+  font-size: var(--text-lg);
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+  text-decoration: none;
+}
+.brand:hover { color: var(--ink); }
+.brand .brand-suffix { color: var(--muted); font-weight: var(--weight-regular); }
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex-wrap: wrap;
+}
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px var(--sp-3);
+  border-radius: var(--r-md);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.nav-link:hover { color: var(--ink); background: var(--surface-sunken); }
+.nav-link[aria-current="page"] { color: var(--ink); background: var(--surface-sunken); }
+
+/* Focused-flow nav (Compass session, diagnostic): quiet meta text on the right */
+.nav-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.nav-meta .counter { font-variant-numeric: tabular-nums; }
+
+/* ---- Shell: footer ------------------------------------------------------------------ */
+.site-footer {
+  max-width: var(--wrap);
+  margin: var(--sp-16) auto var(--sp-8);
+  padding: var(--sp-6);
+  border-top: 1px solid var(--border);
+  color: var(--faint);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+.site-footer.site-footer-wide { max-width: var(--wrap-wide); }
+.site-footer a { color: var(--faint); }
+
+/* ---- Page header ----------------------------------------------------------------------- */
+.page-title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  margin: 0 0 var(--sp-2);
+}
+.lede {
+  color: var(--muted);
+  margin: 0 0 var(--sp-6);
+  max-width: 60ch;
+}
+
+/* ---- Motion discipline --------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

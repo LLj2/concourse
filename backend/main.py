@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Body, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -24,6 +25,10 @@ app = FastAPI(title="Concourse", version="0.1.0")
 
 STATIC_DIR = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# Server-rendered page shell (frontend redesign): pages migrate one-by-one from
+# FileResponse to TemplateResponse. Same URLs, same auth, same response type.
+TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 app.include_router(auth_router)
 app.include_router(compass_router)
@@ -84,8 +89,8 @@ def intake_page(user: dict = Depends(get_current_user)):
 
 
 @app.get("/me")
-def me_page(user: dict = Depends(get_current_user)):
-    return FileResponse(STATIC_DIR / "me.html")
+def me_page(request: Request, user: dict = Depends(get_current_user)):
+    return TEMPLATES.TemplateResponse(request, "me.html")
 
 
 @app.get("/diagnostic")
