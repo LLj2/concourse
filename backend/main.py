@@ -84,8 +84,8 @@ def public_config():
 # ---------- authenticated pages ----------
 
 @app.get("/intake")
-def intake_page(user: dict = Depends(get_current_user)):
-    return FileResponse(STATIC_DIR / "intake.html")
+def intake_page(request: Request, user: dict = Depends(get_current_user)):
+    return TEMPLATES.TemplateResponse(request, "intake.html")
 
 
 @app.get("/me")
@@ -94,8 +94,8 @@ def me_page(request: Request, user: dict = Depends(get_current_user)):
 
 
 @app.get("/diagnostic")
-def diagnostic_page(user: dict = Depends(get_current_user)):
-    return FileResponse(STATIC_DIR / "diagnostic.html")
+def diagnostic_page(request: Request, user: dict = Depends(get_current_user)):
+    return TEMPLATES.TemplateResponse(request, "diagnostic.html")
 
 
 @app.get("/profile")

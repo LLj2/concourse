@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Concourse — set up your plan{% endblock %}
+
+{% block head %}
+<style>
+  .likert-row { display: flex; gap: var(--sp-2); position: relative; }
+  .likert-row .choice { min-width: 0; }
+  .energy-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sp-2); }
+  @media (max-width: 480px) { .energy-grid { grid-template-columns: 1fr; } }
+  .energy-slot {
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    padding: var(--sp-3); background: var(--surface);
+  }
+  .energy-slot .slot-lab {
+    font-weight: var(--weight-semibold); margin-bottom: var(--sp-2);
+    font-size: var(--text-xs); color: var(--muted); letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+  }
+  .toggle-row { display: flex; gap: var(--sp-2); position: relative; }
+  .actions { display: flex; gap: var(--sp-3); align-items: center; margin-top: var(--sp-5); }
+  .hidden { display: none; }
+</style>
+{% endblock %}
+
+{% block nav %}
+<nav class="site-nav" aria-label="Setup">
+  <a class="brand" href="/">Concourse</a>
+  <div class="nav-meta">Step 1 of 1 · setup</div>
+</nav>
+{% endblock %}
+
+{% block wrap_class %}wrap-narrow{% endblock %}
+
+{% block content %}
+<header>
+  <h1 class="page-title">Tell us about your prep</h1>
+  <p class="lede">Five quick questions. We use them to build your first plan today, then refine it as we measure.</p>
+</header>
+
+<form id="intake-form">
+  <!-- Target competition + timing -->
+  <section class="card">
+    <h2 class="card-title">Your target</h2>
+    <p class="card-help">Why we ask: your competition decides which tests you'll face, and the timing decides how we pace you. If you don't have an exact date, give your best estimate — we adjust.</p>
+    <label class="field">
+      <span class="field-label">Target competition</span>
+      <select class="input" name="target_competition" required>
+        <option value="">Select…</option>
+        <option value="AD5_generalist">AD5 generalist (autumn 2026 wave)</option>
+        <option value="AD7_ict">AD7 ICT / specialist</option>
+        <option value="AST">AST (assistant)</option>
+        <option value="other">Other / not sure yet</option>
+      </select>
+    </label>
+    <label class="field hidden" id="comp-picker">
+      <span class="field-label">Specific competition</span>
+      <select class="input" name="target_competition_ref">
+        <option value="">— use my selection above —</option>
+      </select>
+      <span class="field-hint">Optional — tailors your plan to its exact tests.</span>
+    </label>
+    <div class="input-inline">
+      <label class="field">
+        <span class="field-label">Weeks to exam</span>
+        <input class="input" type="number" name="weeks_to_exam" min="1" max="104" required />
+      </label>
+      <label class="field">
+        <span class="field-label">Hours per week you can study</span>
+        <input class="input" type="number" name="weekly_hours" min="1" max="60" required />
+      </label>
+    </div>
+  </section>
+
+  <!-- Energy pattern -->
+  <section class="card">
+    <h2 class="card-title">When are you sharpest?</h2>
+    <p class="card-help">Why we ask: we slot harder topics into the time of day you have the most focus.</p>
+    <div class="energy-grid">
+      <div class="energy-slot">
+        <div class="slot-lab" id="lab-morning">Morning</div>
+        <select class="input" name="energy_morning" aria-labelledby="lab-morning"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select>
+      </div>
+      <div class="energy-slot">
+        <div class="slot-lab" id="lab-afternoon">Afternoon</div>
+        <select class="input" name="energy_afternoon" aria-labelledby="lab-afternoon"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select>
+      </div>
+      <div class="energy-slot">
+        <div class="slot-lab" id="lab-evening">Evening</div>
+        <select class="input" name="energy_evening" aria-labelledby="lab-evening"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select>
+      </div>
+    </div>
+  </section>
+
+  <!-- Prior EPSO experience -->
+  <section class="card">
+    <h2 class="card-title">Have you done EPSO-style tests before?</h2>
+    <p class="card-help">Why we ask: if yes, we skip the intake calibration. You can take a 5-minute quick check later from your dashboard.</p>
+    <div class="toggle-row" role="radiogroup" aria-label="Prior EPSO experience">
+      <input class="choice-input" type="radio" id="prior-yes" name="has_prior_epso_experience" value="true" />
+      <label class="choice" for="prior-yes">Yes</label>
+      <input class="choice-input" type="radio" id="prior-no" name="has_prior_epso_experience" value="false" checked />
+      <label class="choice" for="prior-no">Not yet</label>
+    </div>
+    <label class="field" style="margin-top: var(--sp-4); margin-bottom: 0;" id="last-test-label">
+      <span class="field-label">When was your last EPSO-style test? <span style="font-weight: var(--weight-regular); color: var(--muted);">(optional)</span></span>
+      <input class="input" type="date" name="last_epso_test_at" />
+    </label>
+  </section>
+
+  <!-- Soft self-assessment -->
+  <section class="card">
+    <h2 class="card-title">A quick self-assessment</h2>
+    <p class="card-help">1 = not at all, 5 = strong. Honest is better than optimistic — wrong baselines waste your time.</p>
+
+    <div class="field">
+      <span class="field-label" id="lab-habits">Preparation habits (do you study consistently, with a method?)</span>
+      <div class="likert-row" role="radiogroup" aria-labelledby="lab-habits">
+        <input class="choice-input" type="radio" name="self_habits_score" value="1" id="h1" /><label class="choice" for="h1">1</label>
+        <input class="choice-input" type="radio" name="self_habits_score" value="2" id="h2" /><label class="choice" for="h2">2</label>
+        <input class="choice-input" type="radio" name="self_habits_score" value="3" id="h3" checked /><label class="choice" for="h3">3</label>
+        <input class="choice-input" type="radio" name="self_habits_score" value="4" id="h4" /><label class="choice" for="h4">4</label>
+        <input class="choice-input" type="radio" name="self_habits_score" value="5" id="h5" /><label class="choice" for="h5">5</label>
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="field-label" id="lab-strategy">Test strategy (pacing, guessing, time management on multiple-choice)</span>
+      <div class="likert-row" role="radiogroup" aria-labelledby="lab-strategy">
+        <input class="choice-input" type="radio" name="self_strategy_score" value="1" id="s1" /><label class="choice" for="s1">1</label>
+        <input class="choice-input" type="radio" name="self_strategy_score" value="2" id="s2" /><label class="choice" for="s2">2</label>
+        <input class="choice-input" type="radio" name="self_strategy_score" value="3" id="s3" checked /><label class="choice" for="s3">3</label>
+        <input class="choice-input" type="radio" name="self_strategy_score" value="4" id="s4" /><label class="choice" for="s4">4</label>
+        <input class="choice-input" type="radio" name="self_strategy_score" value="5" id="s5" /><label class="choice" for="s5">5</label>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom: 0;">
+      <span class="field-label" id="lab-eu">EU knowledge breadth (institutions, treaties, policy areas)</span>
+      <div class="likert-row" role="radiogroup" aria-labelledby="lab-eu">
+        <input class="choice-input" type="radio" name="self_eu_breadth_score" value="1" id="e1" /><label class="choice" for="e1">1</label>
+        <input class="choice-input" type="radio" name="self_eu_breadth_score" value="2" id="e2" /><label class="choice" for="e2">2</label>
+        <input class="choice-input" type="radio" name="self_eu_breadth_score" value="3" id="e3" checked /><label class="choice" for="e3">3</label>
+        <input class="choice-input" type="radio" name="self_eu_breadth_score" value="4" id="e4" /><label class="choice" for="e4">4</label>
+        <input class="choice-input" type="radio" name="self_eu_breadth_score" value="5" id="e5" /><label class="choice" for="e5">5</label>
+      </div>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="submit-btn" type="submit">Build my plan</button>
+    <span id="status" class="msg msg-err" role="alert" aria-live="polite"></span>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var form = document.getElementById('intake-form');
+  var status = document.getElementById('status');
+  var btn = document.getElementById('submit-btn');
+
+  // Populate the optional "specific competition" picker from the catalog.
+  // Hidden (and harmless) until the catalog is loaded into the DB.
+  (async function loadCompetitions() {
+    try {
+      var r = await fetch('/api/competitions');
+      if (!r.ok) return;
+      var comps = ((await r.json()).competitions || []).filter(function (c) { return c.title && (c.slug || c.ref); });
+      if (!comps.length) return;
+      var sel = document.querySelector('select[name="target_competition_ref"]');
+      comps.forEach(function (c) {
+        var o = document.createElement('option');
+        o.value = c.slug || c.ref;
+        var bits = [c.title];
+        if (c.grade) bits.push('(' + c.grade + ')');
+        if (c.status) bits.push('· ' + c.status);
+        o.textContent = bits.join(' ');
+        sel.appendChild(o);
+      });
+      document.getElementById('comp-picker').classList.remove('hidden');
+    } catch (e) { /* catalog not loaded yet — keep the generic dropdown only */ }
+  })();
+
+  form.addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    status.className = 'msg msg-err';
+    status.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    var data = Object.fromEntries(new FormData(form).entries());
+    // Normalize types
+    data.weeks_to_exam = parseInt(data.weeks_to_exam, 10);
+    data.weekly_hours  = parseInt(data.weekly_hours, 10);
+    data.has_prior_epso_experience = data.has_prior_epso_experience === 'true';
+    data.self_habits_score   = parseInt(data.self_habits_score, 10);
+    data.self_strategy_score = parseInt(data.self_strategy_score, 10);
+    data.self_eu_breadth_score = parseInt(data.self_eu_breadth_score, 10);
+    data.energy_pattern = {
+      morning: data.energy_morning,
+      afternoon: data.energy_afternoon,
+      evening: data.energy_evening,
+    };
+    delete data.energy_morning; delete data.energy_afternoon; delete data.energy_evening;
+    if (!data.last_epso_test_at) delete data.last_epso_test_at;
+    if (!data.target_competition_ref) delete data.target_competition_ref;
+
+    try {
+      var r = await fetch('/api/intake', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+      });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      if (!r.ok) throw new Error((await r.text()) || 'failed');
+      if (window.ctrack) ctrack('onboarding_completed', { weeks_to_exam: data.weeks_to_exam });
+
+      // Build the Draft plan right now — this is the trust moment (ROADMAP §4.6):
+      // show the plan immediately, not a dashboard of more chores.
+      btn.textContent = 'Building your plan…';
+      try {
+        var pr = await fetch('/api/plan/generate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: '{}',
+        });
+        if (pr.ok) { window.location.replace('/plan'); return; }
+      } catch (e) { /* fall through to the dashboard, which can generate on demand */ }
+      window.location.replace('/me');
+    } catch (e) {
+      status.textContent = 'Could not save: ' + e.message;
+      btn.disabled = false;
+      btn.textContent = 'Build my plan';
+    }
+  });
+</script>
+{% endblock %}

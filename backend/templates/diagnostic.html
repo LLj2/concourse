@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}Concourse — calibration check{% endblock %}
+
+{% block head %}
+<style>
+  .dots { display: inline-flex; gap: 6px; align-items: center; margin-left: var(--sp-2); }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--border-strong); display: inline-block;
+    transition: background var(--t-fast), transform var(--t-fast);
+  }
+  .dot.done { background: var(--accent); }
+  .dot.now { background: var(--accent); transform: scale(1.4); }
+
+  .prompt {
+    font-size: var(--text-lg);
+    line-height: var(--leading-loose);
+    margin: var(--sp-4) 0 var(--sp-6);
+    white-space: pre-wrap;
+  }
+  .actions { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); margin-top: var(--sp-5); }
+  .feedback { font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+  .feedback.ok  { color: var(--ok); }
+  .feedback.err { color: var(--err); }
+
+  .result-card { text-align: center; padding: var(--sp-10) var(--sp-8); }
+  .result-score {
+    font-size: 56px; font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-tight); margin: var(--sp-2) 0;
+    color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+  .result-sub { color: var(--muted); margin: 0 0 var(--sp-5); font-size: var(--text-sm); }
+  .hidden { display: none; }
+</style>
+{% endblock %}
+
+{% block nav %}
+<nav class="site-nav" aria-label="Calibration">
+  <a class="brand" href="/me">Concourse</a>
+  <div class="nav-meta">
+    <span id="prog-text">Calibration · verbal</span>
+    <span class="dots" id="dots" aria-hidden="true"></span>
+  </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<!-- Question card -->
+<div class="card" id="q-card">
+  <div><span class="badge badge-accent" id="q-diff">Difficulty 2</span></div>
+  <div class="prompt" id="q-prompt">Loading…</div>
+  <div class="options-list" id="q-options" role="group" aria-label="Answer options"></div>
+  <div class="ai-insight hidden" id="q-explain"></div>
+  <div class="actions">
+    <div class="feedback" id="q-feedback" aria-live="polite"></div>
+    <button class="btn btn-primary" id="next-btn" disabled>Submit</button>
+  </div>
+</div>
+
+<!-- Result card -->
+<div class="card result-card hidden" id="r-card">
+  <div class="result-sub">Verbal calibration complete</div>
+  <div class="result-score" id="r-score">—</div>
+  <div class="result-sub" id="r-detail">—</div>
+  <div style="margin-top: var(--sp-6);">
+    <a class="btn btn-primary" href="/me">Back to dashboard</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var TARGET = 5;
+  var sessionId = null;
+  var currentItem = null;
+  var selectedIndex = null;
+  var answered = 0;
+  var awaitingNext = false;
+  var startedAt = 0;
+
+  var qCard   = document.getElementById('q-card');
+  var rCard   = document.getElementById('r-card');
+  var qDiff   = document.getElementById('q-diff');
+  var qPrompt = document.getElementById('q-prompt');
+  var qOpts   = document.getElementById('q-options');
+  var qExp    = document.getElementById('q-explain');
+  var qFb     = document.getElementById('q-feedback');
+  var nextBtn = document.getElementById('next-btn');
+  var dotsEl  = document.getElementById('dots');
+
+  function renderDots() {
+    dotsEl.innerHTML = '';
+    for (var i = 0; i < TARGET; i++) {
+      var d = document.createElement('span');
+      d.className = 'dot' + (i < answered ? ' done' : (i === answered ? ' now' : ''));
+      dotsEl.appendChild(d);
+    }
+  }
+
+  function renderItem(item) {
+    currentItem = item;
+    selectedIndex = null;
+    awaitingNext = false;
+    qDiff.textContent = 'Difficulty ' + item.difficulty;
+    qPrompt.textContent = item.prompt;
+    qExp.classList.add('hidden');
+    qFb.textContent = '';
+    qFb.className = 'feedback';
+    nextBtn.textContent = 'Submit';
+    nextBtn.disabled = true;
+    qOpts.innerHTML = '';
+    (item.options || []).forEach(function (opt, idx) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'option';
+      btn.textContent = opt;
+      btn.addEventListener('click', function () { selectOption(idx); });
+      qOpts.appendChild(btn);
+    });
+    renderDots();
+    startedAt = performance.now();
+  }
+
+  function selectOption(idx) {
+    if (awaitingNext) return;
+    var children = qOpts.children;
+    if (idx < 0 || idx >= children.length) return;
+    Array.prototype.forEach.call(children, function (c) { c.classList.remove('selected'); });
+    children[idx].classList.add('selected');
+    selectedIndex = idx;
+    nextBtn.disabled = false;
+  }
+
+  function lockOptions(correctIndex) {
+    Array.prototype.forEach.call(qOpts.children, function (c, idx) {
+      c.disabled = true;
+      c.classList.remove('selected');
+      if (idx === correctIndex) c.classList.add('correct');
+      else if (idx === selectedIndex) c.classList.add('wrong');
+    });
+  }
+
+  function showFinal(final) {
+    qCard.classList.add('hidden');
+    rCard.classList.remove('hidden');
+    document.getElementById('r-score').textContent = (final.score || 0).toFixed(0);
+    document.getElementById('r-detail').textContent =
+      final.items_answered + ' items answered' +
+      (final.median_time_ms ? ' · median ' + Math.round(final.median_time_ms / 1000) + 's per item' : '');
+    answered = TARGET;
+    renderDots();
+    if (window.ctrack) ctrack('diagnostic_completed', { score: final.score });
+  }
+
+  nextBtn.addEventListener('click', async function () {
+    if (awaitingNext) {
+      awaitingNext = false;
+      if (window.__pendingNext) {
+        renderItem(window.__pendingNext);
+        window.__pendingNext = null;
+      } else if (window.__pendingFinal) {
+        showFinal(window.__pendingFinal);
+        window.__pendingFinal = null;
+      }
+      return;
+    }
+    if (selectedIndex === null) return;
+    nextBtn.disabled = true;
+    nextBtn.textContent = 'Checking…';
+    try {
+      var elapsed = Math.round(performance.now() - startedAt);
+      var r = await fetch('/api/diagnostic/answer', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          session_id: sessionId,
+          item_id: currentItem.item_id,
+          selected_index: selectedIndex,
+          time_taken_ms: elapsed,
+        }),
+      });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      if (!r.ok) throw new Error(await r.text());
+      var data = await r.json();
+
+      // show feedback
+      var fb = data.feedback || {};
+      lockOptions(fb.correct_index);
+      qFb.className = 'feedback ' + (fb.is_correct ? 'ok' : 'err');
+      qFb.textContent = fb.is_correct ? 'Correct.' : 'Not quite.';
+      if (fb.explanation) {
+        qExp.classList.remove('hidden');
+        qExp.textContent = fb.explanation;
+      }
+      answered += 1;
+      renderDots();
+
+      if (data.done) {
+        window.__pendingFinal = data.final;
+        nextBtn.textContent = 'See result';
+      } else {
+        window.__pendingNext = data.next_item;
+        nextBtn.textContent = 'Next question';
+      }
+      awaitingNext = true;
+      nextBtn.disabled = false;
+    } catch (e) {
+      qFb.className = 'feedback err';
+      qFb.textContent = 'Could not submit: ' + e.message;
+      nextBtn.disabled = false;
+      nextBtn.textContent = 'Submit';
+    }
+  });
+
+  // Keyboard answer-selection (1–9 select, Enter submit/next)
+  document.addEventListener('keydown', function (e) {
+    if (qCard.classList.contains('hidden')) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    var n = parseInt(e.key, 10);
+    if (!isNaN(n) && n >= 1 && n <= qOpts.children.length && !awaitingNext) {
+      selectOption(n - 1);
+      e.preventDefault();
+    } else if (e.key === 'Enter' && !nextBtn.disabled && tag !== 'BUTTON' && tag !== 'A') {
+      nextBtn.click();
+      e.preventDefault();
+    }
+  });
+
+  (async function start() {
+    try {
+      var r = await fetch('/api/diagnostic/start', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({skill_id: 'verbal', kind: 'periodic'}),
+      });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      if (!r.ok) throw new Error(await r.text());
+      var data = await r.json();
+      sessionId = data.session_id;
+      if (window.ctrack) ctrack('diagnostic_started', { skill: 'verbal' });
+      renderItem(data.item);
+    } catch (e) {
+      qPrompt.textContent = 'Could not start the calibration. ' + e.message;
+      qOpts.innerHTML = '';
+    }
+  })();
+</script>
+{% endblock %}
