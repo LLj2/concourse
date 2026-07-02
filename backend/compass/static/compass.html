@@ -4,194 +4,164 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Concourse — Compass practice</title>
+  <!-- Shared design system (visual consistency only — Compass stays sealed:
+       template + JS live in backend/compass/, no Python coupling). -->
+  <link rel="stylesheet" href="/static/css/tokens.css?v=1" />
+  <link rel="stylesheet" href="/static/css/base.css?v=1" />
+  <link rel="stylesheet" href="/static/css/components.css?v=1" />
   <style>
-    :root {
-      --ink: #0f1d3a; --muted: #5a6b8a; --accent: #1e63d6;
-      --bg: #f7f9fc; --card: #fff; --border: #e5e9f2;
-      --ok: #137a3b; --err: #c03;
+    /* Compass-specific: focused session shell */
+    .session-progress {
+      max-width: var(--wrap);
+      margin: 0 auto;
+      padding: 0 var(--sp-6);
     }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      color: var(--ink); background: var(--bg); line-height: 1.55;
-    }
-    .nav {
-      max-width: 760px; margin: 0 auto; padding: 22px 24px;
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .brand { font-weight: 700; font-size: 18px; }
-    .progress { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 10px; }
-    .counter { font-variant-numeric: tabular-nums; }
-
-    .wrap { max-width: 760px; margin: 12px auto 80px; padding: 0 24px; }
-    .card {
-      background: var(--card); border: 1px solid var(--border);
-      border-radius: 10px; padding: 26px; margin-bottom: 16px;
-    }
-    h2 { margin: 0 0 12px; font-size: 20px; font-weight: 700; }
-    .lede { color: var(--muted); margin-bottom: 18px; }
-
-    /* Setup card */
-    .picker-group { margin-bottom: 22px; }
-    .picker-group-label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
-    .picker-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .picker-btn {
-      flex: 1; min-width: 100px;
-      padding: 12px 14px; border: 1px solid var(--border); background: white;
-      border-radius: 8px; cursor: pointer; font: inherit; color: var(--ink);
-      transition: all 0.06s;
-    }
-    .picker-btn:hover:not(:disabled) { background: #f0f4fb; border-color: var(--accent); }
-    .picker-btn.selected { background: var(--accent); color: white; border-color: var(--accent); }
-    .picker-btn:disabled { background: #f3f5f8; color: #aab; cursor: not-allowed; }
-    .picker-btn .sub { display: block; font-size: 11px; opacity: 0.8; margin-top: 2px; }
-
-    /* Question card */
-    .difficulty {
-      display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 8px;
-      border-radius: 999px; background: #eaf0fb; color: var(--accent); letter-spacing: 0.04em;
-    }
-    .badge-generated {
-      display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 8px;
-      border-radius: 999px; background: #fff4d6; color: #8a6a00;
-      margin-left: 6px; letter-spacing: 0.04em;
-    }
-    .prompt { font-size: 16px; line-height: 1.65; margin: 14px 0 22px; white-space: pre-wrap; }
-    .options { display: flex; flex-direction: column; gap: 10px; }
-    .option {
-      text-align: left; padding: 14px 16px; border: 1px solid var(--border);
-      background: white; border-radius: 8px; cursor: pointer; font: inherit; color: inherit;
-      transition: background 0.05s, border-color 0.05s; line-height: 1.4;
-    }
-    .option:hover:not(:disabled) { background: #f0f4fb; }
-    .option:disabled { cursor: default; }
-    .option.selected { border-color: var(--accent); background: #eaf0fb; }
-    .option.correct { border-color: var(--ok); background: #e8f5ec; }
-    .option.wrong   { border-color: var(--err); background: #fcecec; }
-
-    .actions { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; gap: 12px; }
-    .btn {
-      padding: 11px 22px; border-radius: 8px; border: 1px solid transparent;
-      font-size: 15px; font-weight: 600; cursor: pointer;
-    }
-    .btn-primary { background: var(--accent); color: white; }
-    .btn-primary:disabled { background: #aab; cursor: not-allowed; }
-    .btn-ghost { background: transparent; color: var(--muted); border-color: var(--border); }
-    .btn-ghost:hover { background: var(--bg); }
-    .feedback { font-size: 14px; }
-    .feedback.ok { color: var(--ok); }
-    .feedback.err { color: var(--err); }
-    .explain {
-      margin-top: 16px; padding: 14px 16px; background: #f5f7fc;
-      border-left: 3px solid var(--accent); font-size: 14px; color: #2a3450;
+    .prompt {
+      font-size: var(--text-lg);
+      line-height: var(--leading-loose);
+      margin: var(--sp-4) 0 var(--sp-6);
       white-space: pre-wrap;
     }
-    .meta-line { font-size: 12px; color: var(--muted); margin-top: 10px; }
+    .actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--sp-3);
+      margin-top: var(--sp-5);
+    }
+    .feedback { font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+    .feedback.ok  { color: var(--ok); }
+    .feedback.err { color: var(--err); }
     .flag-link {
-      font-size: 12px; color: var(--muted); margin-left: auto;
-      background: none; border: 0; cursor: pointer; padding: 4px 8px;
-      text-decoration: underline;
+      font-size: var(--text-xs); color: var(--faint); margin-left: auto;
+      background: none; border: 0; cursor: pointer; padding: var(--sp-2);
+      text-decoration: underline; font-family: inherit;
+      min-height: var(--touch);
     }
     .flag-link:hover { color: var(--err); }
 
-    /* Result card */
-    .result-card { padding: 36px 28px; }
-    .result-card h2 { font-size: 22px; }
+    /* result screen */
+    .result-card { padding: var(--sp-10) var(--sp-8); }
     .result-score {
-      font-size: 56px; font-weight: 700; letter-spacing: -0.02em; margin: 8px 0 4px;
-      color: var(--accent);
+      font-size: 56px; font-weight: var(--weight-bold);
+      letter-spacing: var(--tracking-tight); margin: var(--sp-2) 0 var(--sp-1);
+      color: var(--accent); font-variant-numeric: tabular-nums;
     }
-    .result-sub { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
-    .observation {
-      background: #fff8e1; border-left: 3px solid #d99c12; padding: 14px 16px;
-      border-radius: 6px; font-size: 14px; color: #5e4500; margin: 14px 0;
-    }
-    .observation strong { color: #4a3500; }
+    .result-sub { color: var(--muted); margin: 0 0 var(--sp-5); font-size: var(--text-sm); }
 
+    .timer { font-variant-numeric: tabular-nums; color: var(--faint); }
     .hidden { display: none; }
-    .err-banner {
-      background: #fcecec; color: var(--err); padding: 12px 14px; border-radius: 8px;
-      font-size: 14px; margin-bottom: 16px;
+    .picker-group { margin-bottom: var(--sp-6); }
+    .picker-group-label {
+      font-size: var(--text-xs); font-weight: var(--weight-semibold);
+      letter-spacing: var(--tracking-wide); text-transform: uppercase;
+      color: var(--muted); margin-bottom: var(--sp-2);
+    }
+    .kbd-hint { color: var(--faint); font-size: var(--text-xs); margin-top: var(--sp-3); }
+    kbd {
+      font-family: var(--font-mono); font-size: 0.9em;
+      background: var(--surface-sunken); border: 1px solid var(--border-strong);
+      border-radius: 4px; padding: 0 4px;
     }
   </style>
 </head>
 <body>
-  <nav class="nav">
-    <div class="brand">Concourse — Compass</div>
-    <div class="progress">
-      <a href="/me" style="color: var(--muted); text-decoration: none;">Back to /me</a>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- Focused shell: brand + quiet meta, no dashboard chrome -->
+  <nav class="site-nav" aria-label="Session">
+    <a class="brand" href="/me">Concourse <span class="brand-suffix">· Compass</span></a>
+    <div class="nav-meta">
       <span id="prog-text" class="hidden">
-        <span class="counter" id="prog-answered">0</span>/<span id="prog-target">?</span>
-        · <span id="prog-correct" class="counter">0</span> correct
+        <span class="counter" id="prog-answered">0</span>/<span class="counter" id="prog-target">?</span>
+        · <span class="counter" id="prog-correct">0</span> correct
+        · <span class="timer" id="timer">0:00</span>
       </span>
+      <a class="nav-link" href="/me" id="exit-link">Exit practice</a>
     </div>
   </nav>
 
-  <main class="wrap">
+  <!-- Thin session progress bar (hidden until the session starts) -->
+  <div class="session-progress">
+    <div class="progress-track hidden" id="prog-bar" role="progressbar"
+         aria-label="Session progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <span class="progress-fill" id="prog-fill" style="width: 0%"></span>
+    </div>
+  </div>
+
+  <main id="main" class="wrap">
     <!-- Setup card -->
     <div class="card" id="setup-card">
-      <h2>Practice</h2>
+      <h1 class="page-title" style="font-size: var(--text-xl);">Practice</h1>
       <p class="lede">Compass measures real cognitive operations. Each question is targeted at the weakest patterns we've identified for you. Sessions are 10–40 questions.</p>
 
       <div class="picker-group">
-        <div class="picker-group-label">SKILL</div>
-        <div class="picker-row" id="skill-row">
-          <button class="picker-btn selected" data-skill="verbal">Verbal reasoning</button>
-          <button class="picker-btn" data-skill="numerical" disabled>Numerical<span class="sub">coming soon</span></button>
-          <button class="picker-btn" data-skill="abstract" disabled>Abstract<span class="sub">coming soon</span></button>
-          <button class="picker-btn" data-skill="eu_knowledge" disabled>EU knowledge<span class="sub">coming soon</span></button>
+        <div class="picker-group-label" id="skill-label">Skill</div>
+        <div class="choice-row" id="skill-row" role="group" aria-labelledby="skill-label">
+          <button type="button" class="choice selected" data-skill="verbal">Verbal reasoning</button>
+          <button type="button" class="choice" data-skill="numerical" disabled>Numerical<span class="choice-sub">coming soon</span></button>
+          <button type="button" class="choice" data-skill="abstract" disabled>Abstract<span class="choice-sub">coming soon</span></button>
+          <button type="button" class="choice" data-skill="eu_knowledge" disabled>EU knowledge<span class="choice-sub">coming soon</span></button>
         </div>
       </div>
 
       <div class="picker-group">
-        <div class="picker-group-label">LENGTH</div>
-        <div class="picker-row" id="length-row">
-          <button class="picker-btn" data-length="10">Short<span class="sub">10 questions · ~12 min</span></button>
-          <button class="picker-btn selected" data-length="20">Standard<span class="sub">20 questions · ~25 min</span></button>
-          <button class="picker-btn" data-length="40">Long<span class="sub">40 questions · ~50 min</span></button>
+        <div class="picker-group-label" id="length-label">Length</div>
+        <div class="choice-row" id="length-row" role="group" aria-labelledby="length-label">
+          <button type="button" class="choice" data-length="10">Short<span class="choice-sub">10 questions · ~12 min</span></button>
+          <button type="button" class="choice selected" data-length="20">Standard<span class="choice-sub">20 questions · ~25 min</span></button>
+          <button type="button" class="choice" data-length="40">Long<span class="choice-sub">40 questions · ~50 min</span></button>
         </div>
       </div>
 
       <div class="actions">
-        <button class="btn btn-primary" id="start-btn">Start practicing</button>
-        <span id="start-err" class="feedback err"></span>
+        <button class="btn btn-primary" id="start-btn">Start practising</button>
+        <span id="start-status" class="loading-status" aria-live="polite"></span>
+        <span id="start-err" class="msg msg-err" role="alert"></span>
       </div>
     </div>
 
-    <!-- Question card -->
+    <!-- Question card: one question per screen -->
     <div class="card hidden" id="q-card">
       <div>
-        <span class="difficulty" id="q-diff">DIFFICULTY 2</span>
-        <span class="badge-generated hidden" id="q-generated">JUST GENERATED</span>
+        <span class="badge badge-accent" id="q-diff">Difficulty 2</span>
+        <span class="badge badge-warn hidden" id="q-generated" title="This question was generated for you just now">Just generated</span>
       </div>
       <div class="prompt" id="q-prompt">Loading…</div>
-      <div class="options" id="q-options"></div>
-      <div class="explain hidden" id="q-explain"></div>
+      <div class="options-list" id="q-options" role="group" aria-label="Answer options"></div>
+      <div class="ai-insight hidden" id="q-explain"></div>
       <div class="actions">
-        <div class="feedback" id="q-feedback"></div>
+        <div class="feedback" id="q-feedback" aria-live="polite"></div>
         <button class="flag-link hidden" id="flag-btn" title="Report this question as bad or unclear">Report</button>
         <button class="btn btn-primary" id="next-btn" disabled>Submit</button>
       </div>
+      <p class="kbd-hint">Keyboard: <kbd>1</kbd>–<kbd>4</kbd> select an answer · <kbd>Enter</kbd> submit / next</p>
     </div>
 
     <!-- Result card -->
     <div class="card result-card hidden" id="r-card">
-      <h2>Session complete</h2>
+      <h2 style="font-size: var(--text-xl);">Session complete</h2>
       <div class="result-score" id="r-score">—</div>
       <div class="result-sub" id="r-detail">—</div>
-      <div class="observation hidden" id="r-observation"></div>
-      <div class="actions" style="justify-content: flex-start; gap: 10px;">
-        <a class="btn btn-primary" href="/me" style="text-decoration: none;">Back to /me</a>
-        <a class="btn btn-ghost" href="/compass" style="text-decoration: none;">Practice again</a>
+      <div class="ai-insight hidden" id="r-observation" style="margin-bottom: var(--sp-4);"></div>
+      <div class="meta-line hidden" id="r-observation-meta"><span class="provenance">Concourse analysis</span> — based on this session's answers</div>
+      <div class="actions" style="justify-content: flex-start; gap: var(--sp-3); margin-top: var(--sp-5);">
+        <a class="btn btn-primary" href="/me">Back to dashboard</a>
+        <a class="btn btn-secondary" href="/compass">Practice again</a>
       </div>
     </div>
   </main>
 
+  <!-- Shared shell behaviour (PostHog init + ctrack, logout binding) -->
+  <script src="/config.js"></script>
+  <script src="/static/js/app.js?v=1"></script>
   <script>
-    // ===========================================================================
-    // State
-    // ===========================================================================
+    // =========================================================================
+    // Compass session JS — single file by design (no compass static mount),
+    // organized in module-like sections: state / timer / render / api / flow.
+    // =========================================================================
+
+    // ---- state --------------------------------------------------------------
     var skill = 'verbal';
     var length = 20;
     var sessionId = null;
@@ -199,14 +169,20 @@
     var selectedIndex = null;
     var answered = 0;
     var correct = 0;
+    var target = 0;
     var awaitingNext = false;
-    var startedAt = 0;
+    var startedAt = 0;          // per-question clock
+    var sessionStartedAt = 0;   // session clock
+    var pendingNext = null;
+    var pendingFinal = null;
 
-    // DOM
+    // ---- dom ------------------------------------------------------------------
     var setupCard = document.getElementById('setup-card');
     var qCard = document.getElementById('q-card');
     var rCard = document.getElementById('r-card');
     var progText = document.getElementById('prog-text');
+    var progBar = document.getElementById('prog-bar');
+    var progFill = document.getElementById('prog-fill');
     var qDiff = document.getElementById('q-diff');
     var qGenerated = document.getElementById('q-generated');
     var qPrompt = document.getElementById('q-prompt');
@@ -215,16 +191,30 @@
     var qFb = document.getElementById('q-feedback');
     var nextBtn = document.getElementById('next-btn');
     var flagBtn = document.getElementById('flag-btn');
+    var timerEl = document.getElementById('timer');
+    var startBtn = document.getElementById('start-btn');
+    var startStatus = document.getElementById('start-status');
 
-    // ===========================================================================
-    // Setup: skill + length pickers
-    // ===========================================================================
+    function track(ev, props) { if (window.ctrack) window.ctrack(ev, props); }
+
+    // ---- timer (subdued session clock) -------------------------------------------
+    var timerHandle = null;
+    function startTimer() {
+      sessionStartedAt = Date.now();
+      timerHandle = setInterval(function () {
+        var s = Math.floor((Date.now() - sessionStartedAt) / 1000);
+        timerEl.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+      }, 1000);
+    }
+    function stopTimer() { if (timerHandle) { clearInterval(timerHandle); timerHandle = null; } }
+
+    // ---- setup pickers ---------------------------------------------------------------
     function bindPickerRow(rowId, onPick) {
       var row = document.getElementById(rowId);
-      row.querySelectorAll('.picker-btn').forEach(function (btn) {
+      row.querySelectorAll('.choice').forEach(function (btn) {
         btn.addEventListener('click', function () {
           if (btn.disabled) return;
-          row.querySelectorAll('.picker-btn').forEach(function (b) { b.classList.remove('selected'); });
+          row.querySelectorAll('.choice').forEach(function (b) { b.classList.remove('selected'); });
           btn.classList.add('selected');
           onPick(btn.dataset);
         });
@@ -233,11 +223,28 @@
     bindPickerRow('skill-row', function (ds) { skill = ds.skill; });
     bindPickerRow('length-row', function (ds) { length = parseInt(ds.length, 10); });
 
-    document.getElementById('start-btn').addEventListener('click', startSession);
+    startBtn.addEventListener('click', startSession);
 
+    // Staged status text while the session is prepared (never a bare spinner).
+    var stagedHandle = null;
+    function stageStatus(stages) {
+      var i = 0;
+      startStatus.textContent = stages[0];
+      stagedHandle = setInterval(function () {
+        i = Math.min(i + 1, stages.length - 1);
+        startStatus.textContent = stages[i];
+      }, 2200);
+    }
+    function clearStageStatus() {
+      if (stagedHandle) { clearInterval(stagedHandle); stagedHandle = null; }
+      startStatus.textContent = '';
+    }
+
+    // ---- flow: start ----------------------------------------------------------------------
     async function startSession() {
       document.getElementById('start-err').textContent = '';
-      document.getElementById('start-btn').disabled = true;
+      startBtn.disabled = true;
+      stageStatus(['Preparing your session…', 'Selecting question patterns…', 'Almost ready…']);
       try {
         var r = await fetch('/api/compass/practice/start', {
           method: 'POST',
@@ -248,25 +255,30 @@
         if (!r.ok) throw new Error((await r.text()) || 'failed');
         var data = await r.json();
         sessionId = data.session_id;
-        document.getElementById('prog-target').textContent = data.progress.target;
+        target = data.progress.target;
+        document.getElementById('prog-target').textContent = target;
+        clearStageStatus();
         progText.classList.remove('hidden');
+        progBar.classList.remove('hidden');
         setupCard.classList.add('hidden');
         qCard.classList.remove('hidden');
+        startTimer();
+        track('session_started', { skill: skill, target_length: length });
         renderItem(data.item);
       } catch (e) {
+        clearStageStatus();
         document.getElementById('start-err').textContent = 'Could not start: ' + e.message;
-        document.getElementById('start-btn').disabled = false;
+        startBtn.disabled = false;
+        track('ai_operation_failed', { op: 'practice_start' });
       }
     }
 
-    // ===========================================================================
-    // Render current question
-    // ===========================================================================
+    // ---- render -------------------------------------------------------------------------------
     function renderItem(item) {
       currentItem = item;
       selectedIndex = null;
       awaitingNext = false;
-      qDiff.textContent = 'DIFFICULTY ' + item.difficulty;
+      qDiff.textContent = 'Difficulty ' + item.difficulty;
       qGenerated.classList.toggle('hidden', item.source !== 'generated');
       qPrompt.textContent = item.prompt;
       qExp.classList.add('hidden');
@@ -281,16 +293,20 @@
         btn.type = 'button';
         btn.className = 'option';
         btn.textContent = opt;
-        btn.addEventListener('click', function () {
-          if (awaitingNext) return;
-          Array.prototype.forEach.call(qOpts.children, function (c) { c.classList.remove('selected'); });
-          btn.classList.add('selected');
-          selectedIndex = idx;
-          nextBtn.disabled = false;
-        });
+        btn.addEventListener('click', function () { selectOption(idx); });
         qOpts.appendChild(btn);
       });
       startedAt = performance.now();
+    }
+
+    function selectOption(idx) {
+      if (awaitingNext) return;
+      var children = qOpts.children;
+      if (idx < 0 || idx >= children.length) return;
+      Array.prototype.forEach.call(children, function (c) { c.classList.remove('selected'); });
+      children[idx].classList.add('selected');
+      selectedIndex = idx;
+      nextBtn.disabled = false;
     }
 
     function lockOptions(correctIndex) {
@@ -305,9 +321,13 @@
     function updateProgress() {
       document.getElementById('prog-answered').textContent = answered;
       document.getElementById('prog-correct').textContent = correct;
+      var pct = target ? Math.round(100 * answered / target) : 0;
+      progFill.style.width = pct + '%';
+      progBar.setAttribute('aria-valuenow', pct);
     }
 
     function showFinal(final) {
+      stopTimer();
       qCard.classList.add('hidden');
       rCard.classList.remove('hidden');
       var score = final.items_attempted ? Math.round(100 * final.items_correct / final.items_attempted) : 0;
@@ -321,23 +341,17 @@
         var obs = document.getElementById('r-observation');
         obs.innerHTML = '<strong>What we noticed.</strong> ' + final.observation;
         obs.classList.remove('hidden');
+        document.getElementById('r-observation-meta').classList.remove('hidden');
       }
+      track('session_completed', { skill: skill, attempted: final.items_attempted, correct: final.items_correct });
     }
 
-    // ===========================================================================
-    // Submit / Next
-    // ===========================================================================
+    // ---- flow: submit / next --------------------------------------------------------------------
     nextBtn.addEventListener('click', async function () {
       if (awaitingNext) {
-        // user is moving on to the next item OR the final
         awaitingNext = false;
-        if (window.__pendingFinal) {
-          showFinal(window.__pendingFinal);
-          window.__pendingFinal = null;
-        } else if (window.__pendingNext) {
-          renderItem(window.__pendingNext);
-          window.__pendingNext = null;
-        }
+        if (pendingFinal) { showFinal(pendingFinal); pendingFinal = null; }
+        else if (pendingNext) { renderItem(pendingNext); pendingNext = null; }
         return;
       }
       if (selectedIndex === null) return;
@@ -370,27 +384,47 @@
         if (fb.is_correct) correct += 1;
         updateProgress();
         flagBtn.classList.remove('hidden');
+        track('question_answered', {
+          skill: skill, correct: !!fb.is_correct, time_ms: elapsed,
+          position: answered, source: currentItem.source || 'bank',
+        });
 
         if (data.done) {
-          window.__pendingFinal = data.final;
+          pendingFinal = data.final;
           nextBtn.textContent = 'See result';
         } else {
-          window.__pendingNext = data.next_item;
+          pendingNext = data.next_item;
           nextBtn.textContent = 'Next question';
         }
         awaitingNext = true;
         nextBtn.disabled = false;
+        nextBtn.focus();
       } catch (e) {
         qFb.className = 'feedback err';
         qFb.textContent = 'Could not submit: ' + e.message;
         nextBtn.disabled = false;
         nextBtn.textContent = 'Submit';
+        track('ai_operation_failed', { op: 'practice_answer' });
       }
     });
 
-    // ===========================================================================
-    // Flag the current item
-    // ===========================================================================
+    // ---- keyboard answer-selection (1–9 select, Enter submit/next) -------------------------------
+    document.addEventListener('keydown', function (e) {
+      if (qCard.classList.contains('hidden')) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      var tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      var n = parseInt(e.key, 10);
+      if (!isNaN(n) && n >= 1 && n <= qOpts.children.length && !awaitingNext) {
+        selectOption(n - 1);
+        e.preventDefault();
+      } else if (e.key === 'Enter' && !nextBtn.disabled && tag !== 'BUTTON' && tag !== 'A') {
+        nextBtn.click();
+        e.preventDefault();
+      }
+    });
+
+    // ---- flag the current item ---------------------------------------------------------------------
     flagBtn.addEventListener('click', async function () {
       if (!currentItem) return;
       if (!confirm('Report this question as bad? It will be hidden from future sessions.')) return;
