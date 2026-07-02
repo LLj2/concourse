@@ -99,18 +99,18 @@ def diagnostic_page(request: Request, user: dict = Depends(get_current_user)):
 
 
 @app.get("/profile")
-def profile_page(user: dict = Depends(get_current_user)):
-    return FileResponse(STATIC_DIR / "profile.html")
+def profile_page(request: Request, user: dict = Depends(get_current_user)):
+    return TEMPLATES.TemplateResponse(request, "profile.html")
 
 
 @app.get("/plan")
-def plan_page(user: dict = Depends(get_current_user)):
-    return FileResponse(STATIC_DIR / "plan.html")
+def plan_page(request: Request, user: dict = Depends(get_current_user)):
+    return TEMPLATES.TemplateResponse(request, "plan.html")
 
 
 @app.get("/cv")
-def cv_page(user: dict = Depends(get_current_user)):
-    return FileResponse(STATIC_DIR / "cv.html")
+def cv_page(request: Request, user: dict = Depends(get_current_user)):
+    return TEMPLATES.TemplateResponse(request, "cv.html")
 
 
 # ---------- intake API ----------

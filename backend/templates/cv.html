@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% set nav_active = 'me' %}
+
+{% block title %}Concourse — your CV{% endblock %}
+
+{% block head %}
+<style>
+  .step-num { color: var(--accent); font-weight: var(--weight-bold); margin-right: var(--sp-2); }
+  .current { margin-bottom: var(--sp-4); }
+  .actions { display: flex; gap: var(--sp-3); align-items: center; margin-top: var(--sp-4); flex-wrap: wrap; }
+  .continue-row { display: flex; justify-content: space-between; align-items: center; margin-top: var(--sp-8); gap: var(--sp-3); }
+  .skip { color: var(--muted); font-size: var(--text-sm); }
+  .howto {
+    background: var(--accent-soft); border: 1px solid var(--accent-soft-border);
+    border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
+    margin: var(--sp-2) 0 var(--sp-4); font-size: var(--text-sm);
+  }
+  .howto summary { cursor: pointer; font-weight: var(--weight-semibold); min-height: var(--touch); display: flex; align-items: center; }
+  .howto ol { margin: var(--sp-2) 0 var(--sp-2); padding-left: 20px; }
+  .howto li { margin-bottom: var(--sp-1); }
+  .howto .note { color: var(--muted); margin: var(--sp-2) 0 0; }
+  input[type="file"].input { padding: var(--sp-2) var(--sp-3); font-size: var(--text-sm); }
+  .optional-tag { font-weight: var(--weight-regular); color: var(--muted); font-size: var(--text-sm); }
+</style>
+{% endblock %}
+
+{% block wrap_class %}wrap-narrow{% endblock %}
+
+{% block content %}
+<header>
+  <h1 class="page-title">Your CV</h1>
+  <p class="lede">
+    We read your CV once to weight your starting point and flag your fit for the
+    competition you're targeting. Required for specialist competitions, optional
+    otherwise. Adding your LinkedIn profile (as a PDF) sharpens the read.
+  </p>
+</header>
+
+<!-- Step 1 — CV file -->
+<section class="card">
+  <h2 class="card-title"><span class="step-num">1</span>Upload your CV</h2>
+  <p class="card-help">PDF, DOC or DOCX, up to 10&nbsp;MB. A new upload replaces the previous one.</p>
+  <div id="cv-current" class="current alert alert-ok" style="display: none;"></div>
+  <label class="field">
+    <span class="field-label">Choose file</span>
+    <input class="input" type="file" id="cv-file" accept=".pdf,.doc,.docx" />
+  </label>
+  <div class="actions">
+    <button class="btn btn-primary" id="cv-btn" type="button">Upload CV</button>
+    <span id="cv-status" class="msg" aria-live="polite"></span>
+  </div>
+</section>
+
+<!-- Step 2 — LinkedIn PDF -->
+<section class="card" id="linkedin-card">
+  <h2 class="card-title"><span class="step-num">2</span>Add your LinkedIn profile <span class="optional-tag">(optional)</span></h2>
+  <p class="card-help">We read your LinkedIn like a second CV. We can't pull it from a link (LinkedIn blocks that), so you export it yourself — about three clicks.</p>
+  <div id="linkedin-current" class="current alert alert-ok" style="display: none;"></div>
+  <details class="howto">
+    <summary>How to get your LinkedIn PDF</summary>
+    <ol>
+      <li>Open LinkedIn <strong>on a computer</strong> and go to <strong>your profile</strong>.</li>
+      <li>Click the <strong>More</strong> button (just under your name).</li>
+      <li>Choose <strong>Save to PDF</strong> — your profile downloads as a PDF.</li>
+      <li>Upload that PDF here.</li>
+    </ol>
+    <p class="note">On the LinkedIn mobile app this option isn't available — do it from a computer.</p>
+  </details>
+  <label class="field">
+    <span class="field-label">Your LinkedIn PDF</span>
+    <input class="input" type="file" id="linkedin-file" accept="application/pdf,.pdf" />
+  </label>
+  <div class="actions">
+    <button class="btn btn-primary" id="linkedin-btn" type="button">Upload LinkedIn PDF</button>
+    <span id="linkedin-status" class="msg" aria-live="polite"></span>
+  </div>
+</section>
+
+<!-- Optional — portfolio / personal site -->
+<section class="card">
+  <h2 class="card-title">Portfolio / personal site <span class="optional-tag">(optional)</span></h2>
+  <p class="card-help">A link to your portfolio or personal site, if you have one.</p>
+  <label class="field">
+    <span class="field-label">URL</span>
+    <input class="input" type="url" id="portfolio_url" placeholder="https://…" />
+  </label>
+  <div class="actions">
+    <button class="btn btn-primary" id="portfolio-btn" type="button">Save link</button>
+    <span id="portfolio-status" class="msg" aria-live="polite"></span>
+  </div>
+</section>
+
+<!-- Step 3 — fit (revealed once there's something to read) -->
+<section class="card" id="fit-card" style="display: none;">
+  <h2 class="card-title"><span class="step-num">3</span>Check your fit <span class="provenance">· Concourse analysis</span></h2>
+  <p class="card-help">A one-time AI read of how your background fits the tests your target competition uses. Informs your plan — it doesn't change your measured scores.</p>
+  <div id="fit-result"></div>
+  <div id="fit-skeleton" style="display: none;" aria-hidden="true">
+    <div class="skeleton" style="height: 14px; margin-bottom: 8px; width: 85%;"></div>
+    <div class="skeleton" style="height: 14px; margin-bottom: 8px; width: 70%;"></div>
+    <div class="skeleton" style="height: 14px; width: 55%;"></div>
+  </div>
+  <div class="actions">
+    <button class="btn btn-primary" id="fit-btn" type="button">Analyze my fit</button>
+    <span class="loading-status" id="fit-stage" aria-live="polite"></span>
+    <span id="fit-status" class="msg" aria-live="polite"></span>
+  </div>
+</section>
+
+<div class="continue-row">
+  <a class="skip" href="/me">Skip for now</a>
+  <a class="btn btn-primary" href="/me">Continue to dashboard →</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function fmtDate(s) { try { return new Date(s).toLocaleDateString(); } catch (e) { return s; } }
+  function setMsg(el, cls, text) { el.className = 'msg ' + (cls || ''); el.textContent = text; }
+
+  (async function load() {
+    var cvStatus = document.getElementById('cv-status');
+    var r = await fetch('/api/cv');
+    if (r.status === 401) { window.location.replace('/'); return; }
+    var d = await r.json();
+    if (!d.configured) setMsg(cvStatus, 'msg-err', 'CV storage is not configured on the server yet.');
+    if (d.portfolio_url) document.getElementById('portfolio_url').value = d.portfolio_url;
+    if (d.has_cv) renderCv(d);
+    if (d.has_linkedin_pdf) renderLinkedin(d);
+    if (d.has_cv || d.has_linkedin_pdf) {
+      document.getElementById('fit-card').style.display = 'block';
+      if (d.cv_fit) renderFit(d.cv_fit);
+    }
+  })();
+
+  function renderCv(d) {
+    var cur = document.getElementById('cv-current');
+    cur.style.display = 'flex';
+    var name = d.filename || 'your CV';
+    var when = d.uploaded_at ? ' · uploaded ' + fmtDate(d.uploaded_at) : '';
+    var link = d.download_url ? ' — <a href="' + d.download_url + '" target="_blank" rel="noopener">view</a>' : '';
+    cur.innerHTML = '<span>✓ On file: <strong>' + name + '</strong>' + when + link + '</span>';
+  }
+
+  document.getElementById('cv-btn').addEventListener('click', async function () {
+    var cvStatus = document.getElementById('cv-status');
+    var cb = document.getElementById('cv-btn');
+    var f = document.getElementById('cv-file').files[0];
+    setMsg(cvStatus, '', '');
+    if (!f) { setMsg(cvStatus, 'msg-err', 'Choose a CV file first.'); return; }
+    cb.disabled = true; cb.textContent = 'Uploading…';
+    var fd = new FormData(); fd.append('file', f);
+    try {
+      var r = await fetch('/api/cv', { method: 'POST', body: fd });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      if (!r.ok) {
+        var detail = '';
+        try { detail = (await r.json()).detail; } catch (e) { detail = await r.text(); }
+        if (detail === 'unsupported_file_type') detail = 'Use a PDF, DOC or DOCX file.';
+        if (detail === 'file_too_large') detail = 'That file is over 10 MB.';
+        throw new Error(detail || 'failed');
+      }
+      var data = await r.json();
+      renderCv({ has_cv: true, filename: data.cv.filename, uploaded_at: new Date().toISOString() });
+      document.getElementById('fit-card').style.display = 'block';
+      setMsg(cvStatus, 'msg-ok', 'Saved.');
+      if (window.ctrack) ctrack('cv_uploaded', {});
+    } catch (e) {
+      setMsg(cvStatus, 'msg-err', 'Could not save: ' + e.message);
+    }
+    cb.disabled = false; cb.textContent = 'Upload CV';
+  });
+
+  function renderLinkedin(d) {
+    var cur = document.getElementById('linkedin-current');
+    cur.style.display = 'flex';
+    var name = d.linkedin_filename || 'LinkedIn profile';
+    var when = d.linkedin_uploaded_at ? ' · uploaded ' + fmtDate(d.linkedin_uploaded_at) : '';
+    var link = d.linkedin_download_url ? ' — <a href="' + d.linkedin_download_url + '" target="_blank" rel="noopener">view</a>' : '';
+    cur.innerHTML = '<span>✓ On file: <strong>' + name + '</strong>' + when + link + '</span>';
+  }
+
+  document.getElementById('linkedin-btn').addEventListener('click', async function () {
+    var ls = document.getElementById('linkedin-status');
+    var lb = document.getElementById('linkedin-btn');
+    var f = document.getElementById('linkedin-file').files[0];
+    setMsg(ls, '', '');
+    if (!f) { setMsg(ls, 'msg-err', 'Choose your LinkedIn PDF first.'); return; }
+    lb.disabled = true; lb.textContent = 'Uploading…';
+    var fd = new FormData(); fd.append('file', f);
+    try {
+      var r = await fetch('/api/cv/linkedin', { method: 'POST', body: fd });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      if (!r.ok) {
+        var detail = '';
+        try { detail = (await r.json()).detail; } catch (e) { detail = await r.text(); }
+        if (detail === 'linkedin_must_be_pdf') detail = 'Please upload the PDF you saved from LinkedIn.';
+        if (detail === 'linkedin_not_enabled') detail = 'LinkedIn upload isn\'t enabled on the server yet.';
+        throw new Error(detail || 'failed');
+      }
+      var data = await r.json();
+      renderLinkedin({ has_linkedin_pdf: true, linkedin_filename: data.linkedin.filename });
+      document.getElementById('fit-card').style.display = 'block';
+      setMsg(ls, 'msg-ok', 'Saved.');
+    } catch (e) {
+      setMsg(ls, 'msg-err', 'Could not upload: ' + e.message);
+    }
+    lb.disabled = false; lb.textContent = 'Upload LinkedIn PDF';
+  });
+
+  document.getElementById('portfolio-btn').addEventListener('click', async function () {
+    var ps = document.getElementById('portfolio-status');
+    var pb = document.getElementById('portfolio-btn');
+    var url = document.getElementById('portfolio_url').value.trim();
+    setMsg(ps, '', '');
+    if (!url) { setMsg(ps, 'msg-err', 'Enter a URL first.'); return; }
+    pb.disabled = true; pb.textContent = 'Saving…';
+    var fd = new FormData(); fd.append('portfolio_url', url);
+    try {
+      var r = await fetch('/api/cv', { method: 'POST', body: fd });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      if (!r.ok) {
+        var detail = '';
+        try { detail = (await r.json()).detail; } catch (e) { detail = await r.text(); }
+        throw new Error(detail || 'failed');
+      }
+      setMsg(ps, 'msg-ok', 'Saved.');
+    } catch (e) {
+      setMsg(ps, 'msg-err', 'Could not save: ' + e.message);
+    }
+    pb.disabled = false; pb.textContent = 'Save link';
+  });
+
+  var FIT_BADGE = { strong: 'badge-ok', moderate: 'badge-accent', weak: 'badge-warn', unclear: '',
+                    on_track: 'badge-ok', tight: 'badge-warn', at_risk: 'badge-err' };
+  function chip(text, key) {
+    return '<span class="badge ' + (FIT_BADGE[key] || '') + '">' + text + '</span>';
+  }
+  function bullets(arr) {
+    // The schema says these are arrays, but the LLM occasionally returns a bare
+    // string — coerce so a stray string can't crash the whole fit render.
+    if (typeof arr === 'string') arr = arr.trim() ? [arr] : [];
+    if (!Array.isArray(arr) || !arr.length) return '';
+    return '<ul style="margin: 6px 0 0; padding-left: 18px;">' + arr.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
+  }
+  function section(title, arr) {
+    var b = bullets(arr);
+    return b ? '<div style="font-weight: var(--weight-semibold); margin-top: var(--sp-2); font-size: var(--text-sm);">' + title + '</div>' + b : '';
+  }
+  function renderFit(fit) {
+    var el = document.getElementById('fit-result');
+    var html = '<div style="margin-bottom: var(--sp-2); display: flex; gap: var(--sp-2); flex-wrap: wrap;">' +
+      chip('Specialist fit: ' + (fit.specialist_fit || '—'), fit.specialist_fit) + ' ' +
+      chip('Feasibility: ' + (fit.go_no_go || '—'), fit.go_no_go) + '</div>';
+    if (fit.summary) html += '<p style="margin: 0 0 var(--sp-2); font-size: var(--text-sm);">' + fit.summary + '</p>';
+    html += section('Relevant strengths', fit.relevant_strengths);
+    html += section('Gaps', fit.gaps);
+    if (fit.strategy_note) html += '<p style="margin: var(--sp-3) 0 0; font-size: var(--text-sm);"><strong>Strategy:</strong> ' + fit.strategy_note + '</p>';
+    html += section('Competitions that might fit better', fit.alternatives);
+    el.innerHTML = html;
+    document.getElementById('fit-btn').textContent = 'Re-analyze';
+  }
+
+  // Staged status while the LLM reads the CV (skeleton + text, never a bare spinner)
+  var fitStage = document.getElementById('fit-stage');
+  var fitSkeleton = document.getElementById('fit-skeleton');
+  var stagedHandle = null;
+  function stageFitStatus() {
+    var stages = ['Reading your CV…', 'Comparing with your target competition…', 'Writing the fit read…'];
+    var i = 0;
+    fitStage.textContent = stages[0];
+    fitSkeleton.style.display = 'block';
+    stagedHandle = setInterval(function () {
+      i = Math.min(i + 1, stages.length - 1);
+      fitStage.textContent = stages[i];
+    }, 2500);
+  }
+  function clearFitStatus() {
+    if (stagedHandle) { clearInterval(stagedHandle); stagedHandle = null; }
+    fitStage.textContent = '';
+    fitSkeleton.style.display = 'none';
+  }
+
+  document.getElementById('fit-btn').addEventListener('click', async function () {
+    var fs = document.getElementById('fit-status');
+    var fb = document.getElementById('fit-btn');
+    setMsg(fs, '', ''); fb.disabled = true; fb.textContent = 'Analyzing…';
+    stageFitStatus();
+    try {
+      var r = await fetch('/api/cv/fit', { method: 'POST' });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      if (!r.ok) {
+        var detail = '';
+        try { detail = (await r.json()).detail; } catch (e) { detail = await r.text(); }
+        if (detail === 'no_documents') detail = 'Upload your CV or LinkedIn PDF first.';
+        if (detail === 'text_unreadable') detail = 'We couldn\'t read enough text from your file — try a text-based PDF.';
+        throw new Error(detail || 'failed');
+      }
+      var payload = await r.json();
+      clearFitStatus();
+      renderFit(payload.cv_fit);
+      if (window.ctrack) ctrack('cv_analysis_completed', {});
+    } catch (e) {
+      clearFitStatus();
+      setMsg(fs, 'msg-err', 'Could not analyze: ' + e.message);
+      fb.disabled = false; fb.textContent = 'Analyze my fit';
+      if (window.ctrack) ctrack('ai_operation_failed', { op: 'cv_fit' });
+      return;
+    }
+    fb.disabled = false;
+  });
+</script>
+{% endblock %}

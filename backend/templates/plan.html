@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% set nav_active = 'plan' %}
+
+{% block title %}Concourse — your draft plan{% endblock %}
+
+{% block head %}
+<style>
+  .alloc-row { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-2); }
+  .alloc-row .lab { width: 160px; font-size: var(--text-sm); }
+  .alloc-row .bar-track { flex: 1; }
+  .alloc-row .min { width: 70px; text-align: right; font-size: var(--text-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+  @media (max-width: 480px) {
+    .alloc-row { flex-wrap: wrap; }
+    .alloc-row .lab { width: 100%; }
+  }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); }
+  .card-head .card-title { margin: 0; }
+  .controls { display: flex; gap: var(--sp-3); align-items: end; flex-wrap: wrap; }
+  .controls .field { margin-bottom: 0; }
+  .controls .field .input { width: auto; min-width: 90px; }
+  .task { display: flex; justify-content: space-between; align-items: center; padding: var(--sp-3) var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); margin-bottom: var(--sp-2); }
+  .task .area { font-weight: var(--weight-semibold); font-size: var(--text-sm); }
+  .task .min { color: var(--muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); font-size: var(--text-sm); }
+  .hidden { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<header>
+  <h1 class="page-title">Your draft plan</h1>
+  <p class="lede">A first weekly allocation built from your background (CV, competition) and what we've measured so far. It's a starting point — it sharpens into your real plan as you practise and we learn your patterns.</p>
+</header>
+
+<div id="replan-banner" class="alert alert-warn hidden">
+  <span id="replan-reason"></span>
+  <button class="btn btn-primary btn-sm" id="replan-btn">Refresh plan</button>
+</div>
+
+<section class="card">
+  <div class="card-head">
+    <h2 class="card-title">Weekly allocation</h2>
+    <button class="btn btn-primary btn-sm" id="gen-btn">Generate draft</button>
+  </div>
+  <div id="competition" class="alert alert-info hidden" style="margin-top: var(--sp-3); margin-bottom: 0;"></div>
+  <div id="alloc" style="margin-top: var(--sp-4);"></div>
+  <div id="alloc-empty" class="empty-state hidden">No draft yet. Generate one above.</div>
+  <div id="rationale" class="ai-insight hidden" style="margin-top: var(--sp-3);"></div>
+  <div class="meta-line" id="plan-when"></div>
+  <div class="msg" id="gen-msg" aria-live="polite"></div>
+</section>
+
+<section class="card" id="daily-card">
+  <h2 class="card-title">Today's session</h2>
+  <div class="controls">
+    <label class="field">
+      <span class="field-label">Minutes</span>
+      <input class="input" type="number" id="minutes" min="15" step="15" placeholder="auto" />
+    </label>
+    <label class="field">
+      <span class="field-label">Energy</span>
+      <select class="input" id="energy">
+        <option value="high">High</option>
+        <option value="medium" selected>Medium</option>
+        <option value="low">Low</option>
+      </select>
+    </label>
+    <button class="btn btn-secondary" id="daily-btn">Plan today</button>
+  </div>
+  <div id="tasks" style="margin-top: var(--sp-4);"></div>
+  <div id="tasks-empty" class="empty-state">Generate a weekly plan first, then plan today.</div>
+</section>
+
+<section class="card">
+  <h2 class="card-title">Did you study today?</h2>
+  <div class="controls" id="adh-buttons">
+    <button class="btn btn-secondary" data-status="done">✓ Done</button>
+    <button class="btn btn-secondary" data-status="partial">◐ Partial</button>
+    <button class="btn btn-secondary" data-status="skipped">✗ Skipped</button>
+  </div>
+  <div class="muted" id="adh-today" style="margin-top: var(--sp-3);"></div>
+  <div class="muted" id="adh-week" style="margin-top: var(--sp-1);"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var LABEL = {
+    verbal: 'Verbal reasoning', numerical: 'Numerical reasoning',
+    abstract: 'Abstract reasoning', eu_knowledge: 'EU knowledge',
+    test_strategy: 'Test strategy & mocks',
+  };
+  var TEST_LABEL = {
+    verbal_reasoning: 'Verbal reasoning', numerical_reasoning: 'Numerical reasoning',
+    abstract_reasoning: 'Abstract reasoning', reasoning: 'Reasoning tests',
+    eu_knowledge: 'EU knowledge', digital_skills: 'Digital skills',
+    situational_judgement: 'Situational judgement', case_study: 'Case study',
+    written_essay_eufte: 'Written essay (EUFTE)', written_test: 'Written test',
+    field_related_mcq: 'Field-related MCQ', competency_test: 'Competency test',
+    talent_screener: 'Talent screener', assessment_centre: 'Assessment centre',
+    interview: 'Interview', oral: 'Oral test',
+  };
+
+  function renderCompetition(master) {
+    var el = document.getElementById('competition');
+    var comp = master && master.allocation && master.allocation.competition;
+    if (!comp || !comp.tests || !comp.tests.length) { el.classList.add('hidden'); return; }
+    var tests = comp.tests.map(function (t) { return TEST_LABEL[t] || t; }).join(' · ');
+    var who = comp.title ? ('<strong>' + comp.title + (comp.grade ? ' (' + comp.grade + ')' : '') + '</strong>') : 'Your competition';
+    var note = comp.source === 'fallback' ? ' <span style="color: var(--muted);">(typical tests — pick your exact competition to refine)</span>' : '';
+    el.innerHTML = '<span><span class="provenance">Competition information</span><br>' + who + ' — tests you\'ll face: ' + tests + note + '</span>';
+    el.classList.remove('hidden');
+  }
+
+  function renderAllocation(master) {
+    renderCompetition(master);
+    var allocEl = document.getElementById('alloc');
+    var emptyEl = document.getElementById('alloc-empty');
+    var ratEl = document.getElementById('rationale');
+    var whenEl = document.getElementById('plan-when');
+    if (!master) { emptyEl.classList.remove('hidden'); allocEl.innerHTML = ''; return; }
+    emptyEl.classList.add('hidden');
+    var by = master.allocation.by_area || {};
+    var total = master.allocation.weekly_minutes || Object.values(by).reduce(function(a,b){return a+b;},0) || 1;
+    allocEl.innerHTML = '';
+    Object.keys(by).sort(function(a,b){return by[b]-by[a];}).forEach(function (area) {
+      var pct = Math.round(by[area] / total * 100);
+      var row = document.createElement('div');
+      row.className = 'alloc-row';
+      row.innerHTML =
+        '<div class="lab">' + (LABEL[area] || area) + '</div>' +
+        '<div class="bar-track progress-track progress-bar" role="img" aria-label="' + (LABEL[area] || area) + ': ' + by[area] + ' minutes per week"><span class="progress-fill" style="width:' + pct + '%"></span></div>' +
+        '<div class="min">' + by[area] + ' min</div>';
+      allocEl.appendChild(row);
+    });
+    if (master.rationale_md) { ratEl.textContent = master.rationale_md; ratEl.classList.remove('hidden'); }
+    else ratEl.classList.add('hidden');
+    if (master.created_at) whenEl.textContent = 'Generated ' + new Date(master.created_at).toLocaleString() + ' · trigger: ' + (master.trigger_kind || 'manual');
+    document.getElementById('gen-btn').textContent = 'Regenerate draft';
+  }
+
+  function renderTasks(daily) {
+    var el = document.getElementById('tasks');
+    var empty = document.getElementById('tasks-empty');
+    if (!daily.tasks || !daily.tasks.length) { empty.classList.remove('hidden'); el.innerHTML=''; return; }
+    empty.classList.add('hidden');
+    el.innerHTML = '';
+    daily.tasks.forEach(function (t) {
+      var d = document.createElement('div');
+      d.className = 'task';
+      d.innerHTML = '<span class="area">' + (LABEL[t.area] || t.area) + '</span><span class="min">' + t.minutes + ' min</span>';
+      el.appendChild(d);
+    });
+    var tot = document.createElement('div');
+    tot.className = 'muted'; tot.style.marginTop = 'var(--sp-2)';
+    tot.textContent = 'Total ' + daily.minutes + ' min · ' + daily.energy + ' energy';
+    el.appendChild(tot);
+  }
+
+  var genBtn = document.getElementById('gen-btn');
+  genBtn.addEventListener('click', async function () {
+    var msg = document.getElementById('gen-msg'); msg.textContent=''; msg.className='msg';
+    genBtn.disabled = true; genBtn.textContent = 'Generating…';
+    try {
+      var r = await fetch('/api/plan/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      if (r.status === 400) throw new Error('Complete your intake first.');
+      if (!r.ok) throw new Error(await r.text());
+      await load();
+    } catch (e) {
+      msg.className='msg msg-err'; msg.textContent = 'Could not generate: ' + e.message;
+      genBtn.disabled = false; genBtn.textContent = 'Generate draft';
+    }
+  });
+
+  document.getElementById('daily-btn').addEventListener('click', async function () {
+    var minutes = document.getElementById('minutes').value;
+    var energy = document.getElementById('energy').value;
+    var body = { energy: energy };
+    if (minutes) body.minutes = parseInt(minutes, 10);
+    var r = await fetch('/api/plan/daily', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (r.status === 401) { window.location.replace('/'); return; }
+    var d = await r.json();
+    if (d.needs_plan) { document.getElementById('tasks-empty').classList.remove('hidden'); return; }
+    renderTasks(d);
+  });
+
+  function renderReplan(replan) {
+    var banner = document.getElementById('replan-banner');
+    if (replan && replan.suggested) {
+      document.getElementById('replan-reason').textContent = replan.reason || 'Your plan can be refreshed.';
+      banner.dataset.trigger = replan.trigger_kind || 'manual';
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  }
+
+  document.getElementById('replan-btn').addEventListener('click', async function () {
+    var trigger = document.getElementById('replan-banner').dataset.trigger || 'manual';
+    var r = await fetch('/api/plan/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({trigger_kind: trigger}) });
+    if (r.status === 401) { window.location.replace('/'); return; }
+    await load();
+  });
+
+  function renderAdherence(a) {
+    var t = a.today || {};
+    document.getElementById('adh-today').textContent = t.logged
+      ? 'Today: ' + t.status + (t.minutes_actual ? ' (' + t.minutes_actual + ' min)' : '')
+      : 'Not logged yet today.';
+    var c = (a.week && a.week.counts) || {};
+    document.getElementById('adh-week').textContent =
+      'This week — done ' + (c.done||0) + ' · partial ' + (c.partial||0) + ' · skipped ' + (c.skipped||0);
+  }
+
+  document.getElementById('adh-buttons').addEventListener('click', async function (e) {
+    var btn = e.target.closest('button[data-status]');
+    if (!btn) return;
+    var r = await fetch('/api/adherence', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status: btn.dataset.status}) });
+    if (r.status === 401) { window.location.replace('/'); return; }
+    var d = await r.json();
+    renderAdherence({ today: d.today, week: (await (await fetch('/api/adherence')).json()).week });
+    renderReplan(d.replan);
+  });
+
+  async function load() {
+    var r = await fetch('/api/plan');
+    if (r.status === 401) { window.location.replace('/'); return; }
+    var d = await r.json();
+    renderAllocation(d.master);
+    renderReplan(d.replan);
+    genBtn.disabled = false;
+    if (window.ctrack) ctrack('plan_viewed', { has_plan: !!d.master });
+    var a = await (await fetch('/api/adherence')).json();
+    renderAdherence(a);
+  }
+  load();
+</script>
+{% endblock %}

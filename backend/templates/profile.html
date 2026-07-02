@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% set nav_active = 'me' %}
+
+{% block title %}Concourse — your profile{% endblock %}
+
+{% block head %}
+<style>
+  .scores-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-3); }
+  @media (max-width: 480px) { .scores-grid { grid-template-columns: 1fr; } }
+  .skill {
+    background: var(--surface-sunken); border: 1px solid var(--border);
+    border-radius: var(--r-md); padding: var(--sp-4);
+  }
+  .skill .lab { font-size: var(--text-xs); color: var(--muted); margin-bottom: var(--sp-1); }
+  .skill .val { font-size: var(--text-2xl); font-weight: var(--weight-bold); color: var(--accent); }
+  .skill .val.unmeasured { color: var(--muted); font-size: var(--text-md); font-weight: var(--weight-semibold); }
+  .skill .bar-track { margin-top: var(--sp-2); }
+  .insight ul { margin: var(--sp-2) 0 var(--sp-4); padding-left: 18px; }
+  .insight li { font-size: var(--text-sm); margin-bottom: var(--sp-1); }
+  .insight .summary { font-size: var(--text-md); margin: 0 0 var(--sp-4); }
+  .insight .note { font-size: var(--text-sm); color: var(--muted); border-left: 3px solid var(--border); padding-left: var(--sp-3); }
+  .muted { color: var(--muted); font-size: var(--text-sm); }
+  .row { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; }
+  .hidden { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<header>
+  <h1 class="page-title">Your profile</h1>
+  <p class="lede">Measured reasoning, your self-assessment, and an AI read of where to focus. Numbers come from real tests; the read is generated from them.</p>
+</header>
+
+<section class="card">
+  <h2 class="card-title">Measured reasoning <span class="provenance">· Your data</span></h2>
+  <div id="scores" class="scores-grid"></div>
+  <p id="scores-empty" class="empty-state hidden" style="margin-top: var(--sp-3);">No measured scores yet. <a href="/diagnostic">Take a calibration check</a> to baseline your verbal reasoning.</p>
+</section>
+
+<section class="card">
+  <h2 class="card-title">Self-assessment &amp; constraints</h2>
+  <dl class="kv" id="self-dl"></dl>
+</section>
+
+<section class="card insight">
+  <h2 class="card-title">AI read <span class="provenance">· Concourse analysis</span> <span id="gng" class="badge hidden"></span></h2>
+  <div id="insight-body">
+    <p class="muted" id="insight-empty">No insights generated yet.</p>
+  </div>
+  <div id="insight-skeleton" class="hidden" aria-hidden="true">
+    <div class="skeleton" style="height: 14px; margin-bottom: 8px; width: 90%;"></div>
+    <div class="skeleton" style="height: 14px; margin-bottom: 8px; width: 75%;"></div>
+    <div class="skeleton" style="height: 14px; width: 60%;"></div>
+  </div>
+  <div class="row" style="margin-top: var(--sp-3);">
+    <button class="btn btn-primary" id="gen-btn">Generate insights</button>
+    <span class="loading-status" id="gen-status" aria-live="polite"></span>
+    <span class="muted" id="gen-when"></span>
+  </div>
+  <div class="msg" id="gen-msg" aria-live="polite"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var SKILL_ORDER = ['verbal', 'numerical', 'abstract', 'eu_knowledge'];
+  var SKILL_LABEL = {
+    verbal: 'Verbal reasoning', numerical: 'Numerical reasoning',
+    abstract: 'Abstract reasoning', eu_knowledge: 'EU knowledge',
+  };
+
+  function renderScores(measured) {
+    var el = document.getElementById('scores');
+    var empty = document.getElementById('scores-empty');
+    el.innerHTML = '';
+    var any = false;
+    SKILL_ORDER.forEach(function (sk) {
+      var m = measured[sk];
+      var div = document.createElement('div');
+      div.className = 'skill';
+      if (m && m.score !== null && m.score !== undefined) {
+        any = true;
+        var v = Math.round(m.score);
+        div.innerHTML =
+          '<div class="lab">' + SKILL_LABEL[sk] + '</div>' +
+          '<div class="val">' + v + '</div>' +
+          '<div class="bar-track progress-track" role="img" aria-label="' + SKILL_LABEL[sk] + ' score ' + v + ' out of 100"><span class="progress-fill" style="width:' + v + '%"></span></div>';
+      } else {
+        div.innerHTML =
+          '<div class="lab">' + SKILL_LABEL[sk] + '</div>' +
+          '<div class="val unmeasured">Not measured</div>';
+      }
+      el.appendChild(div);
+    });
+    empty.classList.toggle('hidden', any);
+  }
+
+  function renderSelf(p) {
+    var s = p.self_rated || {}, c = p.constraints || {};
+    function likert(n) { return (n || n === 0) ? n + ' / 5' : '—'; }
+    var rows = [
+      ['Target competition', c.target_competition || '—'],
+      ['Weeks to exam', c.weeks_to_exam ? c.weeks_to_exam + ' weeks' : '—'],
+      ['Hours per week', c.weekly_hours ? c.weekly_hours + ' h' : '—'],
+      ['Prior EPSO experience', c.has_prior_epso_experience === true ? 'Yes' : (c.has_prior_epso_experience === false ? 'Not yet' : '—')],
+      ['Self-rated habits', likert(s.habits)],
+      ['Self-rated strategy', likert(s.strategy)],
+      ['Self-rated EU breadth', likert(s.eu_breadth)],
+    ];
+    var dl = document.getElementById('self-dl');
+    dl.innerHTML = '';
+    rows.forEach(function (r) {
+      dl.innerHTML += '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>';
+    });
+  }
+
+  function renderNarrative(n, when) {
+    var body = document.getElementById('insight-body');
+    var gng = document.getElementById('gng');
+    if (!n) { return; }
+    var html = '<p class="summary">' + n.summary + '</p>';
+    if (n.strengths && n.strengths.length) {
+      html += '<strong>Strengths</strong><ul>' + n.strengths.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
+    }
+    if (n.focus_areas && n.focus_areas.length) {
+      html += '<strong>Focus next</strong><ul>' + n.focus_areas.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
+    }
+    if (n.strategy_note) html += '<p class="note">' + n.strategy_note + '</p>';
+    body.innerHTML = html;
+    if (n.go_no_go) {
+      var cls = { on_track: 'badge badge-ok', tight: 'badge badge-warn', at_risk: 'badge badge-err' }[n.go_no_go] || 'badge';
+      gng.className = cls;
+      gng.textContent = { on_track: 'On track', tight: 'Tight', at_risk: 'At risk' }[n.go_no_go] || n.go_no_go;
+      gng.classList.remove('hidden');
+    }
+    if (when) document.getElementById('gen-when').textContent = 'Generated ' + new Date(when).toLocaleString();
+  }
+
+  var genBtn = document.getElementById('gen-btn');
+  var genStatus = document.getElementById('gen-status');
+  var skeletonEl = document.getElementById('insight-skeleton');
+
+  // Staged status while the LLM writes (skeleton + text, never a bare spinner)
+  var stagedHandle = null;
+  function stageStatus(stages) {
+    var i = 0;
+    genStatus.textContent = stages[0];
+    skeletonEl.classList.remove('hidden');
+    stagedHandle = setInterval(function () {
+      i = Math.min(i + 1, stages.length - 1);
+      genStatus.textContent = stages[i];
+    }, 2500);
+  }
+  function clearStageStatus() {
+    if (stagedHandle) { clearInterval(stagedHandle); stagedHandle = null; }
+    genStatus.textContent = '';
+    skeletonEl.classList.add('hidden');
+  }
+
+  async function generate() {
+    var msg = document.getElementById('gen-msg');
+    msg.textContent = ''; msg.className = 'msg';
+    genBtn.disabled = true; genBtn.textContent = 'Generating…';
+    stageStatus(['Reading your measured scores…', 'Comparing with your self-assessment…', 'Writing your read…']);
+    try {
+      var r = await fetch('/api/profile/narrate', { method: 'POST' });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      if (!r.ok) {
+        var detail = await r.text();
+        if (r.status === 400) throw new Error('Complete your intake first.');
+        throw new Error(detail);
+      }
+      var data = await r.json();
+      clearStageStatus();
+      renderNarrative(data.narrative, new Date().toISOString());
+      genBtn.textContent = 'Regenerate';
+    } catch (e) {
+      clearStageStatus();
+      msg.className = 'msg msg-err';
+      msg.textContent = 'Could not generate: ' + e.message;
+      genBtn.textContent = 'Generate insights';
+      if (window.ctrack) ctrack('ai_operation_failed', { op: 'profile_narrate' });
+    } finally {
+      genBtn.disabled = false;
+    }
+  }
+  genBtn.addEventListener('click', generate);
+
+  (async function load() {
+    var r = await fetch('/api/profile');
+    if (r.status === 401) { window.location.replace('/'); return; }
+    var d = await r.json();
+    renderScores(d.profile.measured || {});
+    renderSelf(d.profile);
+    if (d.narrative) {
+      var emptyMsg = document.getElementById('insight-empty');
+      if (emptyMsg) emptyMsg.remove();
+      renderNarrative(d.narrative, d.narrative_generated_at);
+      genBtn.textContent = 'Regenerate';
+    }
+    if (!d.ai_configured) {
+      genBtn.disabled = true;
+      document.getElementById('gen-msg').textContent = 'AI not configured on this environment.';
+    }
+  })();
+</script>
+{% endblock %}
