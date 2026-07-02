@@ -51,7 +51,8 @@ The architectural keystone (fixes Risks 1, 3, 5 at once): **the product measures
 | Diagnostic breadth | Numerical/abstract/EU item banks | 🟡 Replaced by Compass — generation pipeline produces them on demand |
 | Session 9 | Stripe trial + paywall + funnel instrumentation | ⛔ Blocked — Stripe account/owner (#4); deferred until Compass v1 ships |
 | Layer B | Screenshot/paste → LLM parse | ❌ Dropped — Compass platform-native testing is the moat instead |
-| Pilot | Closed pilot (10–30 users) on Compass, watch week-3 retention | ⬜ Not started — gated on Compass v1 |
+| Frontend MVP | Build-step-free consolidation: Jinja2 templates + design-token CSS + Compass session shell; make the 8 pages coherent & pilot-credible | 🟡 Planned — see `docs/FRONTEND_PLAN.md`; not started. Pilot-credibility workstream (parallel to §6 hardening) |
+| Pilot | Closed pilot (10–30 users) on Compass, watch week-3 retention | ⬜ Not started — gated on Compass v1, §6 hardening, and Frontend MVP |
 | Launch | Public launch for AD5/AD7 wave, turn on paid channels | ⬜ Not started |
 
 ---
